@@ -348,6 +348,36 @@ function PawnSetDefaultKeybindings()
 			end
 		end
 	end
+	
+	-- Bag Hooks
+	-- ContainerFrameItemButton_OnEnter is the main function that shows tooltips for bag items.
+	-- Hook this to ensure PawnUpdateTooltip is called whenever a bag item is hovered, similar to character slots.
+	if ContainerFrameItemButton_OnEnter then
+		local original_ContainerFrameItemButton_OnEnter = ContainerFrameItemButton_OnEnter
+		ContainerFrameItemButton_OnEnter = function()
+			-- First call the original function to let the tooltip build
+			original_ContainerFrameItemButton_OnEnter()
+			
+			-- Now manually inject Pawn since standard SetBagItem hooks might have issues in 1.12
+			if this and this:GetParent() then
+				local container = this:GetParent():GetID()
+				local slot = this:GetID()
+				if container and slot then
+					PawnUpdateTooltip(GameTooltip, "SetBagItem", container, slot)
+					
+					-- Set up PawnData for OnUpdate watcher
+					if GameTooltip.PawnData then
+						GameTooltip.PawnData.LastMethod = "SetBagItem"
+						GameTooltip.PawnData.LastP1 = container
+						GameTooltip.PawnData.LastP2 = slot
+						GameTooltip.PawnData.PawnLinesAdded = nil -- Force logic to check again
+						GameTooltip.PawnData.LastNumLines = GameTooltip:NumLines()
+					end
+					GameTooltip:Show()
+				end
+			end
+		end
+	end
 		
 	-- MultiTips compatibility
 	if MultiTips then
