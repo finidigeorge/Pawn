@@ -468,12 +468,14 @@ end
 function PawnCommand(Command)
 	if Command == "" then
 		PawnUIShow()
-	elseif Command == PawnLocal.DebugOnCommand then
+	elseif Command == PawnLocal.DebugOnCommand or Command == PawnLocal.CheckOnCommand then
 		PawnOptions.Debug = true
+		VgerCore.Message(PawnLocal.CheckOnMessage)
 		PawnResetTooltips()
 		if PawnUIFrame_DebugCheck then PawnUIFrame_DebugCheck:SetChecked(PawnOptions.Debug) end
-	elseif Command == PawnLocal.DebugOffCommand then
+	elseif Command == PawnLocal.DebugOffCommand or Command == PawnLocal.CheckOffCommand then
 		PawnOptions.Debug = false
+		VgerCore.Message(PawnLocal.CheckOffMessage)
 		PawnResetTooltips()
 		if PawnUIFrame_DebugCheck then PawnUIFrame_DebugCheck:SetChecked(PawnOptions.Debug) end
 	else
@@ -717,14 +719,18 @@ function PawnGetItemDataFromTooltip(TooltipName, MethodName, Param1, Param2, Par
 	-- Ugh, the tooltip doesn't have item information and this item isn't in the Pawn item cache, so we'll have to try to parse this tooltip.	
 	if not Item then
 		Item = PawnGetEmptyCachedItem(nil, ItemName)
-		PawnDebugMessage(" ")
-		PawnDebugMessage("====================")
-		PawnDebugMessage(VgerCore.Color.Green .. ItemName)
+		if PawnOptions.Debug then
+			PawnDebugMessage(" ")
+			PawnDebugMessage("====================")
+			PawnDebugMessage(VgerCore.Color.Green .. ItemName)
+		end
 		
 		-- Since we don't have an item link, we have to just read stats from the original tooltip, so we only get enchanted values.
 		PawnFixStupidTooltipFormatting(TooltipName)
 		Item.Stats, Item.SocketBonusStats, Item.UnknownLines = PawnGetStatsFromTooltip(TooltipName, true)
-		PawnDebugMessage(PawnLocal.FailedToGetItemLinkMessage)
+		if PawnOptions.Debug then
+			PawnDebugMessage(PawnLocal.FailedToGetItemLinkMessage)
+		end
 		
 		-- Cache this item so we don't have to re-parse next time.
 		PawnCacheItem(Item)
@@ -754,9 +760,9 @@ function PawnRecalculateItemValuesIfNecessary(Item)
 	-- just retrieved the stats for the item, and also when the item values were cleared from the cache but not the stats.
 	if not Item.Values then
 		-- Calculate each of the values for which there are scales.
-		Item.Values = PawnGetAllItemValues(Item.Stats, Item.SocketBonusStats, Item.UnenchantedStats, Item.UnenchantedSocketBonusStats, true)
+		Item.Values = PawnGetAllItemValues(Item.Stats, Item.SocketBonusStats, Item.UnenchantedStats, Item.UnenchantedSocketBonusStats, PawnOptions.Debug)
 
-		PawnDebugMessage(" ")
+		if PawnOptions.Debug then PawnDebugMessage(" ") end
 	end
 	
 	return Item.Values
@@ -790,10 +796,6 @@ function PawnUpdateTooltip(Tooltip, MethodName, Param1, Param2, Param3, Param4)
 		TooltipName = Tooltip:GetName()
 	end
 
-	-- Force debug for Alt+Shift
-	local forceDebug = IsAltKeyDown() and IsShiftKeyDown()
-	if forceDebug then PawnOptions.Debug = true end
-	
 	-- Get information for the item in this tooltip.
 	local Item = PawnGetItemDataFromTooltip(TooltipName, MethodName, Param1, Param2, Param3, Param4)
 	if not Item then return end
@@ -1736,6 +1738,7 @@ function PawnGetItemValue(Item, SocketBonus, ScaleName, DebugMessages)
 			else
 				-- It's better to socket this item normally.
 				Total = Total + ProperSocketValue
+				if DebugMessages then PawnDebugMessage(string.format(PawnLocal.TotalValueMessage, Total)) end
 			end
 		end
 	end

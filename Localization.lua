@@ -224,7 +224,7 @@ PawnUIFrame_EnchantedValuesCheck_Tooltip = "Enable this option to have Pawn calc
 PawnUIFrame_NormalizeValuesCheck_Text = "Normalize values (like Lootzor)"
 PawnUIFrame_NormalizeValuesCheck_Tooltip = "Enable this option to divide all Pawn values by the sum of all numbers in your scale, like Lootzor does.\n\nFor more information on this setting, see the readme file."
 PawnUIFrame_DebugCheck_Text = "Show debug info"
-PawnUIFrame_DebugCheck_Tooltip = "If you're not sure how Pawn is calculating the values for a particular item, enable this option to make Pawn spam all sorts of 'useful' data to the chat console whenever you hover over an item.  This information includes which stats Pawn thinks the item has, which parts of the item Pawn doesn't understand, and how it took each one into account for each of your scales.\n\nThis option will fill up your chat log quickly, so you'll want to turn it off once you're finished investigating.\n\nShortcuts:\n/pawn debug on\n/pawn debug off"
+PawnUIFrame_DebugCheck_Tooltip = "If you're not sure how Pawn is calculating the values for a particular item, .\n\nenable this option to make Pawn spam all sorts of 'useful' data to the chat console whenever you hover over an item. \n\nShortcuts:\n/pawn debug on\n/pawn debug off"
 
 PawnUIFrame_OtherOptionsHeaderLabel_Text = "Other options"
 PawnUIFrame_ButtonPositionHeaderLabel_Text = "Show the Pawn button:"
@@ -340,13 +340,17 @@ PawnLocal =
 	-- Slash commands
 	["DebugOnCommand"] = "debug on",
 	["DebugOffCommand"] = "debug off",
+	["CheckOnCommand"] = "check on",
+	["CheckOffCommand"] = "check off",
+	["CheckOnMessage"] = "Pawn item checking is now ON. Hover over any item to see its internal details.",
+	["CheckOffMessage"] = "Pawn item checking is now OFF.",
 	
 	["Usage"] = [[
 Pawn by Vger-Azjol-Nerub
 www.vgermods.com
  
 /pawn -- show or hide the Pawn UI
-/pawn debug [ on | off ] -- spam debug messages to the console
+/pawn debug [ on | off ] -- enable or disable item checking and debug info
  
 For more information on customizing Pawn, please see the help file (Readme.htm) that comes with the mod.
 ]],
