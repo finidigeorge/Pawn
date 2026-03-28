@@ -789,6 +789,10 @@ function PawnUpdateTooltip(Tooltip, MethodName, Param1, Param2, Param3, Param4)
 	elseif type(Tooltip) == "table" then
 		TooltipName = Tooltip:GetName()
 	end
+
+	-- Force debug for Alt+Shift
+	local forceDebug = IsAltKeyDown() and IsShiftKeyDown()
+	if forceDebug then PawnOptions.Debug = true end
 	
 	-- Get information for the item in this tooltip.
 	local Item = PawnGetItemDataFromTooltip(TooltipName, MethodName, Param1, Param2, Param3, Param4)
@@ -911,8 +915,6 @@ function PawnUpdateTooltip(Tooltip, MethodName, Param1, Param2, Param3, Param4)
 		Tooltip.PawnData.LastNumLines = Tooltip:NumLines()
 		
 		-- If this tooltip doesn't have our update hook yet, add it.
-		-- This allows Pawn to be "addon agnostic" and re-inject scales if ANY addon
-		-- adds lines (ItemID, Source, etc.) after Pawn has finished.
 		if not Tooltip.PawnHooked then
 			local OriginalOnUpdate = Tooltip:GetScript("OnUpdate")
 			Tooltip:SetScript("OnUpdate", function()
@@ -922,6 +924,9 @@ function PawnUpdateTooltip(Tooltip, MethodName, Param1, Param2, Param3, Param4)
 			Tooltip.PawnHooked = true
 		end
 	end
+
+	-- Restore debug if it was forced
+	if forceDebug then PawnOptions.Debug = false end
 end
 
 -- Refresh logic for tooltips that might be modified after they are shown.
@@ -1242,16 +1247,10 @@ function PawnGetStatsFromTooltip(TooltipName, DebugMessages)
 		
 		-- Look for this line in the "kill lines" list.  If it's there, we're done.
 		local IsKillLine = false
-		-- Dirty, dirty hack for 2.3: check the color of the text; if it's "name of item set" yellow, then treat it as a kill line.
-		-- Not needed because we look for the (1/8) at the end instead.
-		--local r, g, b = LeftLine:GetTextColor()
-		--if (math.abs(r - 1) < .01) and (math.abs(g - .82) < .01) and (b < .01) then
-		--	IsKillLine = true
-		--end
 		if not IsKillLine then
 			for _, ThisKillLine in pairs(PawnKillLines) do
 				if string.find(LeftLineText, ThisKillLine) then
-					-- This is a known ignored kill line; stop now.
+					if DebugMessages then PawnDebugMessage("Hit kill line: " .. ThisKillLine .. " at line " .. i) end
 					IsKillLine = true
 					break
 				end

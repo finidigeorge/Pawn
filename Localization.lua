@@ -41,6 +41,7 @@ PawnStats =
 	
 	{"Offensive physical stats"},
 	{"Attack power", "Ap", "Attack power.  Does not include attack power that you will receive from Strength or Agility."},
+	{"Armor penetration", "ArmorPenetration", "Armor penetration causes your physical attacks to ignore some of your opponent's armor."},
 	{"Ranged AP", "Rap", "Ranged attack power."},
 	{"Feral AP", "FeralAp", "Attack power in druid feral forms."},
 	{"Hit", "Hit", "Chance to hit with physical attacks."},
@@ -383,9 +384,7 @@ PawnSocketBonusPrefix = "Socket Bonus: "
 -- Lines that match any of the following patterns will cause all further tooltip parsing to stop.
 PawnKillLines =
 {
-	"^ \n$", -- The blank line before set items before WoW 2.3
-	" %(%d+/%d+%)$", -- The (1/8) on set items for all versions of WoW
-	"^|cff00e0ffDropped By", -- Mod compatibility: MobInfo-2 (should match mifontLightBlue .. MI_TXT_DROPPED_BY)
+	-- " %(%d+/%d+%)$", -- The (1/8) on set items for all versions of WoW
 }
 
 -- Lines that begin with any of the following strings will not be searched for separator strings.
@@ -413,6 +412,7 @@ PawnIgnoreNames =
 -- them through the normal gauntlet of expressions.
 PawnNormalizationRegexes =
 {
+	{"^Set: ", ""}, -- Strip "Set: " from the start of lines to allow raw stat parsing
 	{"^([%w%s%.]+) %+(%d+)$", "+%2 %1"}, -- "Stamina +5" --> "+5 Stamina"
 	{"^(.-)|r.*", "%1"}, -- For removing meta gem requirements
 }
@@ -525,6 +525,12 @@ PawnRegexes =
 	{"^Cat's Swiftness$", "Agility", 6, PawnMultipleStatsFixed}, -- Enchantment; has additional effects
 	{"^Equip: Improves your chance to hit by (%d+)%%%.?$", "Hit"},
 	{"^Equip: Increases your chance to hit by (%d+)%%%.?$", "Hit"},
+	{"^Set: Improves your chance to hit by (%d+)%%%.?$", "Hit"},
+	{"^Set: Increases your chance to hit by (%d+)%%%.?$", "Hit"},
+	{"^Improves your chance to hit by (%d+)%%%.?$", "Hit"},
+	{"^Increases your chance to hit by (%d+)%%%.?$", "Hit"},
+	{"^increases your chance to hit by (%d+)%%%.?$", "Hit"},
+	{"^improves your chance to hit by (%d+)%%%.?$", "Hit"},
 	{"^Equip: Improves your chance to get a critical strike by (%d+)%%%.?$", "Crit"},
 	{"^Equip: Increases your chance to get a critical strike by (%d+)%%%.?$", "Crit"},
 	{"^Equip: Improves your chance to hit with spells by (%d+)%%%.?$", "SpellHit"},
@@ -544,8 +550,10 @@ PawnRegexes =
 	{"^Adds ([%d%.,]+) damage per second$", "Dps"},
 	{"^Fiery Weapon$", "Dps", 4, PawnMultipleStatsFixed}, -- weapon enchantment, 
 	{"^Equip: Increases attack power by (%d+)%.$", "Ap"},
+	{"^Equip: %+?(%d+) Attack Power%.?$", "Ap"},
 	{"^%+?(%d+) Attack Power$", "Ap"},
 	{"^Equip: Increases attack power by (%d+) in Cat, Bear, Dire Bear, and Moonkin forms only%.$", "FeralAp"}, -- Mace of Unending Life
+	{"^Equip: Your attacks ignore (%d+) of the target's armor%.?$", "ArmorPenetration"},
 	{"^%+?(%d+) Ranged Attack Power$", "Rap"},
 	{"^Equip: Increases ranged attack power by (%d+)%.$", "Rap"},
 	{"^Savagery$", "Ap", 70, PawnMultipleStatsFixed}, -- weapon enchantment

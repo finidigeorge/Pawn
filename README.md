@@ -19,3 +19,8 @@ A port of the popular item valuation addon **Pawn** (originally for TBC 2.4.3)
 
 ## Credits
 Originally developed by Vger. Ported and optimized for Turtle WoW by Thornfury
+
+
+## Known issues
+- Trinkets and Set bonuses most like won't work unless they are straightforward stat increase
+- There's no working sims for TurtleWoW as far as I'm aware apart Warrior and Mage, so the best source of scale values for now is https://wowsims.github.io/
