@@ -199,6 +199,10 @@ function PawnOnAddonLoaded(AddonName)
 		-- After the inspect UI is loaded, we want to hook it to add the Pawn button.
 		PawnUI_InspectPawnButton_Attach()
 	end
+	
+	-- EquipCompare (and similar addons) may create ComparisonTooltip frames after Pawn initializes.
+	-- Try hooking here as addons load so we don't miss late-created compare tooltips.
+	PawnHookEquipCompareTooltips()
 end
 
 -- Resets all Pawn options and scales.  Used to set the saved variable to a default state.
@@ -262,7 +266,7 @@ function PawnSetDefaultKeybindings()
 	-- gain the Pawn "OnUpdate" watcher that ensures our lines stay at the bottom.
 	local tooltipsToHook = {
 		GameTooltip, ItemRefTooltip, ShoppingTooltip1, ShoppingTooltip2,
-		ComparisonTooltip1, ComparisonTooltip2, AtlasLootTooltip, ItemRefTooltip2,
+		AtlasLootTooltip, ItemRefTooltip2,
 		ItemRefTooltip3, ItemRefTooltip4, ItemRefTooltip5
 	}
 	for _, tooltip in pairs(tooltipsToHook) do
@@ -388,14 +392,88 @@ function PawnSetDefaultKeybindings()
 	end
 	
 	-- EquipCompare compatibility
-	if ComparisonTooltip1 then
-		if ComparisonTooltip1.SetHyperlinkCompareItem then VgerCore.HookInsecureFunction(ComparisonTooltip1, "SetHyperlinkCompareItem", function(self, ItemLink) PawnUpdateTooltip(ComparisonTooltip1, "SetHyperlinkCompareItem", ItemLink) PawnAttachIconToTooltip(ComparisonTooltip1, true) end) end
-		if ComparisonTooltip2.SetHyperlinkCompareItem then VgerCore.HookInsecureFunction(ComparisonTooltip2, "SetHyperlinkCompareItem", function(self, ItemLink) PawnUpdateTooltip(ComparisonTooltip2, "SetHyperlinkCompareItem", ItemLink) PawnAttachIconToTooltip(ComparisonTooltip2, true) end) end
-		if ComparisonTooltip1.SetInventoryItem then VgerCore.HookInsecureFunction(ComparisonTooltip1, "SetInventoryItem", function(self, p1, p2, p3) PawnUpdateTooltip(ComparisonTooltip1, "SetInventoryItem", p1, p2, p3) PawnAttachIconToTooltip(ComparisonTooltip1, true) end) end -- EquipCompare with CharactersViewer
-		if ComparisonTooltip2.SetInventoryItem then VgerCore.HookInsecureFunction(ComparisonTooltip2, "SetInventoryItem", function(self, p1, p2, p3) PawnUpdateTooltip(ComparisonTooltip2, "SetInventoryItem", p1, p2, p3) PawnAttachIconToTooltip(ComparisonTooltip2, true) end) end -- EquipCompare with CharactersViewer
-		if ComparisonTooltip1.SetHyperlink then VgerCore.HookInsecureFunction(ComparisonTooltip1, "SetHyperlink", function(self, ItemLink) PawnUpdateTooltip(ComparisonTooltip1, "SetHyperlink", ItemLink) PawnAttachIconToTooltip(ComparisonTooltip1, true) end) end -- EquipCompare with Armory
-		if ComparisonTooltip2.SetHyperlink then VgerCore.HookInsecureFunction(ComparisonTooltip2, "SetHyperlink", function(self, ItemLink) PawnUpdateTooltip(ComparisonTooltip2, "SetHyperlink", ItemLink) PawnAttachIconToTooltip(ComparisonTooltip2, true) end) end -- EquipCompare with Armory
+	PawnHookEquipCompareTooltips()
+end
+
+-- Hooks EquipCompare tooltips if available.  Safe to call multiple times.
+function PawnHookEquipCompareTooltips()
+	if ComparisonTooltip1 and not ComparisonTooltip1.PawnEquipCompareHooked then
+		if ComparisonTooltip1.SetHyperlinkCompareItem then VgerCore.HookInsecureFunction(ComparisonTooltip1, "SetHyperlinkCompareItem", function(self, ItemLink) PawnUpdateTooltip(ComparisonTooltip1, "SetHyperlinkCompareItem", ItemLink) end) end
+		if ComparisonTooltip1.SetInventoryItem then VgerCore.HookInsecureFunction(ComparisonTooltip1, "SetInventoryItem", function(self, p1, p2, p3) PawnUpdateTooltip(ComparisonTooltip1, "SetInventoryItem", p1, p2, p3) end) end -- EquipCompare with CharactersViewer
+		if ComparisonTooltip1.SetHyperlink then VgerCore.HookInsecureFunction(ComparisonTooltip1, "SetHyperlink", function(self, ItemLink) PawnUpdateTooltip(ComparisonTooltip1, "SetHyperlink", ItemLink) end) end -- EquipCompare with Armory
+		ComparisonTooltip1.PawnEquipCompareHooked = true
 	end
+	if ComparisonTooltip1 and not ComparisonTooltip1.PawnEquipCompareShowHooked then
+		hooksecurefunc(ComparisonTooltip1, "Show", function()
+			if ComparisonTooltip1.GetItem then
+				local _, ItemLink = ComparisonTooltip1:GetItem()
+				if ItemLink then PawnUpdateTooltip(ComparisonTooltip1, "SetHyperlink", ItemLink) end
+			end
+			PawnScheduleEquipCompareRefresh(ComparisonTooltip1, 0.25)
+		end)
+		ComparisonTooltip1.PawnEquipCompareShowHooked = true
+	end
+	if ComparisonTooltip1 and not ComparisonTooltip1.PawnEquipCompareHideHooked then
+		hooksecurefunc(ComparisonTooltip1, "Hide", function()
+			if ComparisonTooltip1.PawnData then
+				ComparisonTooltip1.PawnData.PawnLinesAdded = nil
+				ComparisonTooltip1.PawnData.LastItemLink = nil
+			end
+		end)
+		ComparisonTooltip1.PawnEquipCompareHideHooked = true
+	end
+
+	if ComparisonTooltip2 and not ComparisonTooltip2.PawnEquipCompareHooked then
+		if ComparisonTooltip2.SetHyperlinkCompareItem then VgerCore.HookInsecureFunction(ComparisonTooltip2, "SetHyperlinkCompareItem", function(self, ItemLink) PawnUpdateTooltip(ComparisonTooltip2, "SetHyperlinkCompareItem", ItemLink) end) end
+		if ComparisonTooltip2.SetInventoryItem then VgerCore.HookInsecureFunction(ComparisonTooltip2, "SetInventoryItem", function(self, p1, p2, p3) PawnUpdateTooltip(ComparisonTooltip2, "SetInventoryItem", p1, p2, p3) end) end -- EquipCompare with CharactersViewer
+		if ComparisonTooltip2.SetHyperlink then VgerCore.HookInsecureFunction(ComparisonTooltip2, "SetHyperlink", function(self, ItemLink) PawnUpdateTooltip(ComparisonTooltip2, "SetHyperlink", ItemLink) end) end -- EquipCompare with Armory
+		ComparisonTooltip2.PawnEquipCompareHooked = true
+	end
+	if ComparisonTooltip2 and not ComparisonTooltip2.PawnEquipCompareShowHooked then
+		hooksecurefunc(ComparisonTooltip2, "Show", function()
+			if ComparisonTooltip2.GetItem then
+				local _, ItemLink = ComparisonTooltip2:GetItem()
+				if ItemLink then PawnUpdateTooltip(ComparisonTooltip2, "SetHyperlink", ItemLink) end
+			end
+			PawnScheduleEquipCompareRefresh(ComparisonTooltip2, 0.25)
+		end)
+		ComparisonTooltip2.PawnEquipCompareShowHooked = true
+	end
+	if ComparisonTooltip2 and not ComparisonTooltip2.PawnEquipCompareHideHooked then
+		hooksecurefunc(ComparisonTooltip2, "Hide", function()
+			if ComparisonTooltip2.PawnData then
+				ComparisonTooltip2.PawnData.PawnLinesAdded = nil
+				ComparisonTooltip2.PawnData.LastItemLink = nil
+			end
+		end)
+		ComparisonTooltip2.PawnEquipCompareHideHooked = true
+	end
+end
+
+-- Schedules a one-shot delayed refresh for EquipCompare tooltips.
+-- Useful when another addon redraws the tooltip shortly after Show().
+function PawnScheduleEquipCompareRefresh(Tooltip, Delay)
+	if not Tooltip or Tooltip.PawnEquipCompareRefreshScheduled then return end
+	Tooltip.PawnEquipCompareRefreshScheduled = true
+
+	local OriginalOnUpdate = Tooltip:GetScript("OnUpdate")
+	local Elapsed = 0
+	Tooltip:SetScript("OnUpdate", function()
+		if OriginalOnUpdate then OriginalOnUpdate() end
+		Elapsed = Elapsed + (arg1 or 0)
+		if Elapsed < (Delay or 0.25) then return end
+
+		Tooltip:SetScript("OnUpdate", OriginalOnUpdate)
+		Tooltip.PawnEquipCompareRefreshScheduled = nil
+
+		if Tooltip:IsShown() and Tooltip.GetItem then
+			local _, ItemLink = Tooltip:GetItem()
+			if ItemLink then
+				if Tooltip.PawnData then Tooltip.PawnData.PawnLinesAdded = nil end
+				PawnUpdateTooltip(Tooltip, "SetHyperlink", ItemLink)
+			end
+		end
+	end)
 end
 
 -- Sets a keybinding to its default value if it's not already assigned to something else.  Returns true if anything was changed.
@@ -872,9 +950,15 @@ function PawnUpdateTooltip(Tooltip, MethodName, Param1, Param2, Param3, Param4)
 	-- AtlasLoot / Catalog Check:
 	-- If we've already added Pawn lines to this tooltip for this exact item, don't do it again.
 	if Tooltip.PawnData and Tooltip.PawnData.LastItemLink == Item.Link and Tooltip.PawnData.PawnLinesAdded then
+		-- EquipCompare tooltips are frequently redrawn/reused for the same item link.
+		-- If we keep this flag set, Pawn can stop injecting values after the first pass.
+		if TooltipName == "ComparisonTooltip1" or TooltipName == "ComparisonTooltip2" then
+			Tooltip.PawnData.PawnLinesAdded = nil
+		else
 		-- Clear and re-inject ONLY if the tooltip was actually cleared by another addon
 		-- but for some reason NumLines matches. Otherwise, skip.
-		return
+			return
+		end
 	end
 
 	-- Add the scale values to the tooltip.
@@ -947,7 +1031,8 @@ function PawnUpdateTooltip(Tooltip, MethodName, Param1, Param2, Param3, Param4)
 		Tooltip.PawnData.LastNumLines = Tooltip:NumLines()
 		
 		-- If this tooltip doesn't have our update hook yet, add it.
-		if not Tooltip.PawnHooked then
+		-- ComparisonTooltip1/2 are managed by EquipCompare and can flicker if repeatedly patched on OnUpdate.
+		if not Tooltip.PawnHooked and TooltipName ~= "ComparisonTooltip1" and TooltipName ~= "ComparisonTooltip2" then
 			local OriginalOnUpdate = Tooltip:GetScript("OnUpdate")
 			Tooltip:SetScript("OnUpdate", function()
 				if OriginalOnUpdate then OriginalOnUpdate() end
