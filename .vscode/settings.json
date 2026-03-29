@@ -75,7 +75,9 @@
         "InspectFrame",
         "CharacterFrame",
         "SetTooltipMoney",
-        "PaperDollItemSlotButton_OnEnter"
+        "PaperDollItemSlotButton_OnEnter",
+        "GroupLootFrame1",
+        "LootFrame"
     ],
     "Lua.type.weakUnionCheck": true
 }

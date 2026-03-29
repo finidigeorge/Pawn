@@ -310,6 +310,24 @@ function PawnSetDefaultKeybindings()
 	GroupLootFrame2IconFrame:SetScript("OnMouseUp", LootRollClickHandler)
 	GroupLootFrame3IconFrame:SetScript("OnMouseUp", LootRollClickHandler)
 	GroupLootFrame4IconFrame:SetScript("OnMouseUp", LootRollClickHandler)
+
+	-- Some 1.12/UIPack combos don't reliably trigger our SetLootRollItem hook path.
+	-- Force a tooltip update on loot-roll icon hover after Blizzard has built the tooltip.
+	local function HookLootRollTooltipOnEnter(Frame)
+		if not Frame or Frame.PawnLootRollOnEnterHooked then return end
+		local OriginalOnEnter = Frame:GetScript("OnEnter")
+		Frame:SetScript("OnEnter", function()
+			if OriginalOnEnter then OriginalOnEnter() end
+			if this and this:GetParent() and this:GetParent().rollID then
+				PawnUpdateTooltip(GameTooltip, "SetLootRollItem", this:GetParent().rollID)
+			end
+		end)
+		Frame.PawnLootRollOnEnterHooked = true
+	end
+	HookLootRollTooltipOnEnter(GroupLootFrame1IconFrame)
+	HookLootRollTooltipOnEnter(GroupLootFrame2IconFrame)
+	HookLootRollTooltipOnEnter(GroupLootFrame3IconFrame)
+	HookLootRollTooltipOnEnter(GroupLootFrame4IconFrame)
 	
 	-- The "currently equipped" tooltips (two, in case of rings, trinkets, and dual wielding)
 	if ShoppingTooltip1 and ShoppingTooltip1.SetHyperlinkCompareItem then hooksecurefunc(ShoppingTooltip1, "SetHyperlinkCompareItem", function(ItemLink, p2, p3) PawnUpdateTooltip(ShoppingTooltip1, "SetHyperlinkCompareItem", ItemLink, p2, p3) PawnAttachIconToTooltip(ShoppingTooltip1, true) end) end
@@ -804,6 +822,21 @@ function PawnGetItemDataFromTooltip(TooltipName, MethodName, Param1, Param2, Par
 		-- Special case: if the method is SetHyperlink, then we already have an item link.
 		-- (Normally, GetItem will work, but SetHyperlink is used by some mod compatibility code.)
 		ItemLink = Param1
+	elseif (MethodName == "SetLootRollItem") then
+		-- Party/raid roll tooltips often don't return a link from Tooltip:GetItem() in older clients.
+		-- For hooksecurefunc(self, ...), Param1 may be the tooltip itself and roll ID is Param2.
+		local RollID = Param1
+		if type(Param1) == "table" and Param2 then RollID = Param2 end
+		if RollID and GetLootRollItemLink then
+			ItemLink = GetLootRollItemLink(RollID)
+		end
+	elseif (MethodName == "SetLootItem") then
+		-- Loot window tooltips can similarly fail to expose links through GetItem.
+		local LootSlot = Param1
+		if type(Param1) == "table" and Param2 then LootSlot = Param2 end
+		if LootSlot and GetLootSlotLink then
+			ItemLink = GetLootSlotLink(LootSlot)
+		end
 	elseif Tooltip.GetItem then
 		_, ItemLink = Tooltip:GetItem()
 	end
@@ -2032,6 +2065,70 @@ end
 --	PawnPrivateTooltip:SetOwner(UIParent, "ANCHOR_NONE")
 --	PawnPrivateTooltip:Hide()
 --end
+
+-- Test helper: simulates a loot-window item tooltip path (SetLootItem).
+-- Usage: /run PawnTestLootSlotTooltip()
+function PawnTestLootSlotTooltip()
+	if not LootFrame or not LootButton1 then return end
+	if PawnTestOriginalLootButtonOnEnter == nil then
+		PawnTestOriginalLootButtonOnEnter = LootButton1:GetScript("OnEnter")
+	end
+	LootFrame:Show()
+	LootButton1:Show()
+	if LootButton1.EnableMouse then LootButton1:EnableMouse(true) end
+	if LootButton1Text then LootButton1Text:SetText("|cffff8000[Test Loot Slot]|r") end
+	if LootButton1IconTexture then LootButton1IconTexture:SetTexture("Interface\\Icons\\INV_Sword_04") end
+	if LootButton1Count then LootButton1Count:SetText("1") end
+	LootButton1:SetScript("OnEnter", function()
+		local TestItemLink = "item:18822:0:0:0:0:0:0:0"
+		local OldGetLootSlotLink = GetLootSlotLink
+		GetLootSlotLink = function() return TestItemLink end
+		GameTooltip:SetOwner(LootButton1, "ANCHOR_RIGHT")
+		GameTooltip:SetHyperlink(TestItemLink)
+		PawnUpdateTooltip(GameTooltip, "SetLootItem", 1)
+		GameTooltip:Show()
+		GetLootSlotLink = OldGetLootSlotLink
+	end)
+end
+
+-- Test helper: simulates a need/greed popup tooltip path (SetLootRollItem).
+-- Usage: /run PawnTestLootRollTooltip()
+function PawnTestLootRollTooltip()
+	if not GroupLootFrame1 or not GroupLootFrame1IconFrame then return end
+	if PawnTestOriginalLootRollOnEnter == nil then
+		PawnTestOriginalLootRollOnEnter = GroupLootFrame1IconFrame:GetScript("OnEnter")
+	end
+	GroupLootFrame1:Show()
+	GroupLootFrame1.rollID = 1
+	GroupLootFrame1IconFrame:Show()
+	if GroupLootFrame1IconFrame.EnableMouse then GroupLootFrame1IconFrame:EnableMouse(true) end
+	GroupLootFrame1IconFrame:SetScript("OnEnter", function()
+		local TestItemLink = "item:18822:0:0:0:0:0:0:0"
+		local OldGetLootRollItemLink = GetLootRollItemLink
+		GetLootRollItemLink = function() return TestItemLink end
+		GameTooltip:SetOwner(GroupLootFrame1IconFrame, "ANCHOR_RIGHT")
+		GameTooltip:SetHyperlink(TestItemLink)
+		PawnUpdateTooltip(GameTooltip, "SetLootRollItem", 1)
+		GameTooltip:Show()
+		GetLootRollItemLink = OldGetLootRollItemLink
+	end)
+end
+
+-- Restores tooltip scripts changed by Pawn test helpers and hides test frames.
+-- Usage: /run PawnClearLootTestHooks()
+function PawnClearLootTestHooks()
+	if LootButton1 and PawnTestOriginalLootButtonOnEnter ~= nil then
+		LootButton1:SetScript("OnEnter", PawnTestOriginalLootButtonOnEnter)
+	end
+	if GroupLootFrame1IconFrame and PawnTestOriginalLootRollOnEnter ~= nil then
+		GroupLootFrame1IconFrame:SetScript("OnEnter", PawnTestOriginalLootRollOnEnter)
+	end
+	if GameTooltip and GameTooltip:IsShown() then GameTooltip:Hide() end
+	if LootButton1 and LootButton1:IsShown() then LootButton1:Hide() end
+	if LootFrame and LootFrame:IsShown() then LootFrame:Hide() end
+	if GroupLootFrame1IconFrame and GroupLootFrame1IconFrame:IsShown() then GroupLootFrame1IconFrame:Hide() end
+	if GroupLootFrame1 and GroupLootFrame1:IsShown() then GroupLootFrame1:Hide() end
+end
 
 -- Depending on the user's current tooltip icon settings, show and hide icons as appropriate.
 function PawnToggleTooltipIcons()
