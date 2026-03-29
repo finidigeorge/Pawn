@@ -946,70 +946,6 @@ function PawnGetQuestItemLinkByName(ItemName)
 	end
 end
 
--- Attempts to force-refresh Pawn values for quest-owned GameTooltip content.
--- This is a last-resort path for UI packs that bypass standard tooltip method hooks.
-function PawnTryRefreshQuestOwnedTooltip(Tooltip)
-	if not Tooltip or Tooltip ~= GameTooltip then return end
-	if not Tooltip.GetItem then return end
-
-	local IsQuestContext = false
-	if Tooltip.PawnData and Tooltip.PawnData.IsQuestTooltip then
-		IsQuestContext = true
-	elseif Tooltip.GetOwner and Tooltip:GetOwner() and Tooltip:GetOwner().GetName then
-		local OwnerName = Tooltip:GetOwner():GetName()
-		if OwnerName and string.find(OwnerName, "Quest") then
-			IsQuestContext = true
-		end
-	end
-	if not IsQuestContext then
-		local TooltipItemName = PawnGetItemNameFromTooltip("GameTooltip")
-		if TooltipItemName and PawnGetQuestItemLinkByName then
-			local QuestNameLink = PawnGetQuestItemLinkByName(TooltipItemName)
-			if QuestNameLink and PawnGetHyperlinkType(QuestNameLink) == "item" then
-				IsQuestContext = true
-			end
-		end
-	end
-	if not IsQuestContext then return end
-
-	local _, ItemLink = Tooltip:GetItem()
-	if (not ItemLink) or PawnGetHyperlinkType(ItemLink) ~= "item" then
-		local ItemName = PawnGetItemNameFromTooltip("GameTooltip")
-		if ItemName then
-			ItemLink = PawnGetQuestItemLinkByName(ItemName)
-		end
-	end
-
-	if not ItemLink or PawnGetHyperlinkType(ItemLink) ~= "item" then return end
-	if PawnTooltipHasPawnScaleLine(Tooltip) then
-		if Tooltip.PawnData then Tooltip.PawnData.PawnLinesAdded = true end
-		return
-	end
-	if Tooltip.PawnData and Tooltip.PawnData.LastItemLink == ItemLink and Tooltip.PawnData.PawnLinesAdded then
-		if PawnTooltipHasPawnScaleLine(Tooltip) then
-			return
-		end
-		Tooltip.PawnData.PawnLinesAdded = nil
-	end
-	if Tooltip.PawnData then
-		local QuestMethod = Tooltip.PawnData.LastQuestMethod
-		local Q1 = Tooltip.PawnData.LastQuestP1
-		local Q2 = Tooltip.PawnData.LastQuestP2
-		local Q3 = Tooltip.PawnData.LastQuestP3
-		local Q4 = Tooltip.PawnData.LastQuestP4
-		if (not QuestMethod) and (Tooltip.PawnData.LastMethod == "SetQuestItem" or Tooltip.PawnData.LastMethod == "SetQuestLogItem") then
-			QuestMethod = Tooltip.PawnData.LastMethod
-			Q1 = Tooltip.PawnData.LastP1
-			Q2 = Tooltip.PawnData.LastP2
-			Q3 = Tooltip.PawnData.LastP3
-			Q4 = Tooltip.PawnData.LastP4
-		end
-		if (QuestMethod == "SetQuestItem" or QuestMethod == "SetQuestLogItem") and Q1 and Q2 then
-			PawnUpdateTooltip(Tooltip, QuestMethod, Q1, Q2, Q3, Q4)
-		end
-	end
-end
-
 -- Gets the item data for a specific item.  Retrieves the information from the cache when possible; otherwise, gets it from the tooltip specified.
 -- Return value type is the same as PawnGetCachedItem.
 function PawnGetItemDataFromTooltip(TooltipName, MethodName, Param1, Param2, Param3, Param4)
@@ -1361,11 +1297,6 @@ function PawnUpdateTooltip(Tooltip, MethodName, Param1, Param2, Param3, Param4)
 		Tooltip.PawnData.LastP3 = Param3
 		Tooltip.PawnData.LastP4 = Param4
 		if MethodName == "SetQuestItem" or MethodName == "SetQuestLogItem" then
-			Tooltip.PawnData.LastQuestMethod = MethodName
-			Tooltip.PawnData.LastQuestP1 = Param1
-			Tooltip.PawnData.LastQuestP2 = Param2
-			Tooltip.PawnData.LastQuestP3 = Param3
-			Tooltip.PawnData.LastQuestP4 = Param4
 			Tooltip.PawnData.LastQuestRepairLines = nil
 			Tooltip.PawnData.LastQuestRepairLink = nil
 		end
@@ -1413,17 +1344,6 @@ function PawnPatchTooltip(Tooltip)
 
 	local function RepatchTooltip(TargetTooltip, PreferredLink)
 		if not TargetTooltip then return end
-		if IsQuestOwnedTooltip(TargetTooltip) then
-			local QuestMethod = TargetTooltip.PawnData and TargetTooltip.PawnData.LastQuestMethod
-			local Q1 = TargetTooltip.PawnData and TargetTooltip.PawnData.LastQuestP1
-			local Q2 = TargetTooltip.PawnData and TargetTooltip.PawnData.LastQuestP2
-			local Q3 = TargetTooltip.PawnData and TargetTooltip.PawnData.LastQuestP3
-			local Q4 = TargetTooltip.PawnData and TargetTooltip.PawnData.LastQuestP4
-			if (QuestMethod == "SetQuestItem" or QuestMethod == "SetQuestLogItem") and Q1 and Q2 then
-				PawnUpdateTooltip(TargetTooltip, QuestMethod, Q1, Q2, Q3, Q4)
-				return
-			end
-		end
 
 		local LastMethod = TargetTooltip.PawnData and TargetTooltip.PawnData.LastMethod
 		if LastMethod == "SetQuestItem" or LastMethod == "SetQuestLogItem" then
