@@ -111,9 +111,6 @@ function PawnInitialize()
 		return
 	end
 
-	SLASH_PAWN1 = "/pawn"
-	SlashCmdList["PAWN"] = function(msg) PawnCommand(msg) end
-
 	-- Set any unset options to their default values.  If the user is a new Pawn user, all options
 	-- will be set to default values.  If upgrading, only missing options will be set to default values.
 	PawnSetEmptyOptions()
@@ -1075,8 +1072,6 @@ function PawnUpdateTooltip(Tooltip, MethodName, Param1, Param2, Param3, Param4)
 		end
 	end
 
-	-- Restore debug if it was forced
-	if forceDebug then PawnOptions.Debug = false end
 end
 
 -- Refresh logic for tooltips that might be modified after they are shown.
@@ -1155,9 +1150,11 @@ function PawnGetAllItemValues(Item, SocketBonus, UnenchantedItem, UnenchantedIte
 		end
 		
 		-- Add these values to the table.
+		local HasEnchantedValue = (Value ~= nil)
+		local HasUnenchantedValue = (UnenchantedValue ~= nil)
 		if Value == nil then Value = 0 end
 		if UnenchantedValue == nil then UnenchantedValue = 0 end
-		if Value > 0 or UnenchantedValue > 0 then
+		if HasEnchantedValue or HasUnenchantedValue then
 			table.insert(ItemValues, {ScaleName, Value, UnenchantedValue})
 		end
 	end
@@ -1189,10 +1186,10 @@ function PawnAddValuesToTooltip(Tooltip, ItemValues, OnlyFirstValue)
 		if not Scale.Hidden then
 			-- Ignore values that we don't want to display.
 			if OnlyFirstValue then
-				UnenchantedValue = 0
+				UnenchantedValue = nil
 			else
-				if not PawnOptions.ShowEnchanted then Value = 0 end
-				if not PawnOptions.ShowUnenchanted then UnenchantedValue = 0 end
+				if not PawnOptions.ShowEnchanted then Value = nil end
+				if not PawnOptions.ShowUnenchanted then UnenchantedValue = nil end
 			end
 		
 			local TooltipText = nil
@@ -1206,6 +1203,10 @@ function PawnAddValuesToTooltip(Tooltip, ItemValues, OnlyFirstValue)
 			elseif Value and Value > 0 then
 				TooltipText = string.format(PawnUnenchantedAnnotationFormat, TextColor, ScaleName, tostring(Value))
 			elseif UnenchantedValue and UnenchantedValue > 0 then
+				TooltipText = string.format(PawnUnenchantedAnnotationFormat, TextColor, ScaleName, tostring(UnenchantedValue))
+			elseif Value == 0 then
+				TooltipText = string.format(PawnUnenchantedAnnotationFormat, TextColor, ScaleName, tostring(Value))
+			elseif UnenchantedValue == 0 then
 				TooltipText = string.format(PawnUnenchantedAnnotationFormat, TextColor, ScaleName, tostring(UnenchantedValue))
 			end
 			
