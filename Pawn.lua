@@ -17,6 +17,19 @@ if not hooksecurefunc and VgerCore and VgerCore.HookInsecureFunction then
 	end
 end
 
+-- Compatibility helper for checking if an addon is present/enabled across client variants.
+function PawnIsAddOnLoaded(AddOnName)
+	if not AddOnName or AddOnName == "" then return false end
+
+	local GlobalTable = getfenv and getfenv(0)
+	local AddOnLoadedFunc = GlobalTable and GlobalTable.IsAddOnLoaded
+	if AddOnLoadedFunc then
+		return AddOnLoadedFunc(AddOnName) and true or false
+	end
+
+	return false
+end
+
 -- Caching
 -- 	An item in the cache has the following properties: Name, NumLines, UnknownLines, Stats, SocketBonusStats, UnenchantedStats, UnenchantedSocketBonusStats, Values, Link, PrettyLink, Level, ItemID
 --	(See PawnGetEmptyCachedItem.)
@@ -27,6 +40,36 @@ local PawnScaleTotals = { }
 local PawnStaticTooltipHooksInstalled = false
 local PawnPaperDollOnEnterHooked = false
 local PawnContainerOnEnterHooked = false
+
+PawnInternal = PawnInternal or {}
+function PawnInternal.GetItemCache()
+	return PawnItemCache
+end
+function PawnInternal.SetItemCache(NewCache)
+	PawnItemCache = NewCache
+end
+function PawnInternal.GetStaticTooltipHooksInstalled()
+	return PawnStaticTooltipHooksInstalled
+end
+function PawnInternal.SetStaticTooltipHooksInstalled(Value)
+	PawnStaticTooltipHooksInstalled = Value
+end
+function PawnInternal.GetPaperDollOnEnterHooked()
+	return PawnPaperDollOnEnterHooked
+end
+function PawnInternal.SetPaperDollOnEnterHooked(Value)
+	PawnPaperDollOnEnterHooked = Value
+end
+function PawnInternal.GetContainerOnEnterHooked()
+	return PawnContainerOnEnterHooked
+end
+function PawnInternal.SetContainerOnEnterHooked(Value)
+	PawnContainerOnEnterHooked = Value
+end
+
+-- Class-style namespaces (compatibility wrappers are kept for existing global API calls).
+PawnTooltipBuilder = PawnTooltipBuilder or {}
+PawnUIController = PawnUIController or {}
 
 -- Formatting
 local PawnEnchantedAnnotationFormat = nil
@@ -165,30 +208,11 @@ function PawnInitialize()
 	end)
 	hooksecurefunc(GameTooltip, "Show", function()
 		if GameTooltip.PawnShowHookRunning or GameTooltip.UpdatingPawn then return end
-		if GameTooltip.PawnData and GameTooltip.PawnData.IsQuestTooltip then
+		if PawnIsQuestLikeGameTooltip(GameTooltip) then
 			GameTooltip.PawnShowHookRunning = true
 			PawnPatchTooltip(GameTooltip)
 			GameTooltip.PawnShowHookRunning = nil
 			return
-		end
-		if GameTooltip.GetOwner and GameTooltip:GetOwner() and GameTooltip:GetOwner().GetName then
-			local OwnerName = GameTooltip:GetOwner():GetName()
-			if OwnerName and string.find(OwnerName, "Quest") then
-				GameTooltip.PawnShowHookRunning = true
-				PawnPatchTooltip(GameTooltip)
-				GameTooltip.PawnShowHookRunning = nil
-				return
-			end
-		end
-		local TooltipItemName = PawnGetItemNameFromTooltip("GameTooltip")
-		if TooltipItemName and PawnGetQuestItemLinkByName then
-			local QuestNameLink = PawnGetQuestItemLinkByName(TooltipItemName)
-			if QuestNameLink and PawnGetHyperlinkType(QuestNameLink) == "item" then
-				GameTooltip.PawnShowHookRunning = true
-				PawnPatchTooltip(GameTooltip)
-				GameTooltip.PawnShowHookRunning = nil
-				return
-			end
 		end
 		if not GameTooltip.GetItem then return end
 		local _, ItemLink = GameTooltip:GetItem()
@@ -213,23 +237,28 @@ function PawnInitialize()
 		if AtlasLootTooltip.SetLootItem then
 			VgerCore.HookInsecureFunction(AtlasLootTooltip, "SetLootItem", function(self, p1, p2) PawnUpdateTooltip(AtlasLootTooltip, "SetLootItem", p1, p2) end)
 		end
-		
-		-- Hook OnUpdate to detect if AtlasLoot / Atlas-TW has modified the tooltip after it was shown.
-		-- This replaces the clumsy "separate tooltip" approach by effectively re-injecting Pawn lines
-		-- ONLY if the tooltip content was changed by AtlasLoot.
-		AtlasLootTooltip:SetScript("OnUpdate", function()
-			-- First call the original OnUpdate if any
-			if this.PawnOriginalOnUpdate then this.PawnOriginalOnUpdate() end
+		if not AtlasLootTooltip.PawnOnUpdateHooked then
+			local AtlasLootOriginalOnUpdate = AtlasLootTooltip:GetScript("OnUpdate")
 			
-			-- Only check if we have data for this tooltip
-			if this.PawnData and this.PawnData.LastItemLink then
-				-- If the line count has changed, it means AtlasLoot added its Source/ItemID lines.
-				-- We wait for Atlas-TW to finish its work, then re-update OUR lines.
-				if this:NumLines() ~= this.PawnData.LastNumLines then
-					PawnUpdateTooltip(this, "SetHyperlink", this.PawnData.LastItemLink)
+			-- Hook OnUpdate to detect if AtlasLoot / Atlas-TW has modified the tooltip after it was shown.
+			-- This replaces the clumsy "separate tooltip" approach by effectively re-injecting Pawn lines
+			-- ONLY if the tooltip content was changed by AtlasLoot.
+			AtlasLootTooltip:SetScript("OnUpdate", function()
+				-- First call the original OnUpdate if any
+				if AtlasLootOriginalOnUpdate then AtlasLootOriginalOnUpdate() end
+				local Tooltip = this
+				
+				-- Only check if we have data for this tooltip
+				if Tooltip and Tooltip.PawnData and Tooltip.PawnData.LastItemLink then
+					-- If the line count has changed, it means AtlasLoot added its Source/ItemID lines.
+					-- We wait for Atlas-TW to finish its work, then re-update OUR lines.
+					if Tooltip:NumLines() ~= Tooltip.PawnData.LastNumLines then
+						PawnUpdateTooltip(Tooltip, "SetHyperlink", Tooltip.PawnData.LastItemLink)
+					end
 				end
-			end
-		end)
+			end)
+			AtlasLootTooltip.PawnOnUpdateHooked = true
+		end
 	end
 	
 	-- LinkWrangler compatibility
@@ -279,7 +308,7 @@ function PawnSetEmptyOptions()
 	if PawnOptions.ShowItemLevel == nil  then PawnOptions.ShowItemLevel = false end
 	
 	-- Disable Item ID and Item Level by default if AtlasLoot is installed to avoid tooltip clutter/conflicts.
-	if IsAddOnLoaded("AtlasLoot") or IsAddOnLoaded("AtlasLoot_ClassicWoW") or IsAddOnLoaded("AtlasLoot_TurtleWoW") then
+	if PawnIsAddOnLoaded("AtlasLoot") or PawnIsAddOnLoaded("AtlasLoot_ClassicWoW") or PawnIsAddOnLoaded("AtlasLoot_TurtleWoW") then
 		PawnOptions.ShowItemID = false
 		PawnOptions.ShowItemLevel = false
 	end
@@ -299,457 +328,19 @@ end
 
 -- Once per new version of Pawn that adds keybindings, bind the new actions to default keys.
 function PawnSetDefaultKeybindings()
-	if PawnOptions.LastKeybindingsSet == nil  then PawnOptions.LastKeybindingsSet = 0 end
-	local BindingSet = false
-	
-	-- Keybindings for opening the Pawn UI and setting comparison items.
-	if PawnOptions.LastKeybindingsSet < 1 then
-		BindingSet = PawnSetKeybindingIfAvailable(PAWN_TOGGLE_UI_DEFAULT_KEY, "PAWN_TOGGLE_UI") or BindingSet
-		BindingSet = PawnSetKeybindingIfAvailable(PAWN_COMPARE_LEFT_DEFAULT_KEY, "PAWN_COMPARE_LEFT") or BindingSet
-		BindingSet = PawnSetKeybindingIfAvailable(PAWN_COMPARE_RIGHT_DEFAULT_KEY, "PAWN_COMPARE_RIGHT") or BindingSet
-	end
-	
-	-- If any keybindings were changed, save the user's bindings.
-	if BindingSet then SaveBindings(GetCurrentBindingSet()) end
-	
-	-- Record that we've set those keybindings, so we don't try to set them again in the future, even if
-	-- the user clears them.
-	PawnOptions.LastKeybindingsSet = 1
-	
-	-- Tooltip Tracking Mechanism:
-	-- We hook the standard tooltips so that whenever they are shown/updated, they 
-	-- gain the Pawn "OnUpdate" watcher that ensures our lines stay at the bottom.
-	local tooltipsToHook = {
-		GameTooltip, ItemRefTooltip, ShoppingTooltip1, ShoppingTooltip2,
-		AtlasLootTooltip, ItemRefTooltip2,
-		ItemRefTooltip3, ItemRefTooltip4, ItemRefTooltip5
-	}
-	for _, tooltip in pairs(tooltipsToHook) do
-		if tooltip and not tooltip.PawnHooked then
-			local originalOnUpdate = tooltip:GetScript("OnUpdate")
-			tooltip:SetScript("OnUpdate", function()
-				if originalOnUpdate then originalOnUpdate() end
-				PawnPatchTooltip(this)
-			end)
-			tooltip.PawnHooked = true
-		end
-	end
-	PawnTryHookAdditionalTooltips()
-	
-	if not PawnStaticTooltipHooksInstalled then
-		-- The item link tooltip
-		hooksecurefunc(ItemRefTooltip, "SetHyperlink",
-			function(ItemLink)
-				-- Attach an icon to the tooltip first so that an existing icon can be hidden if the new hyperlink doesn't have one.
-				PawnAttachIconToTooltip(ItemRefTooltip, false, ItemLink)
-				if PawnGetHyperlinkType(ItemLink) ~= "item" then return end
-				PawnUpdateTooltip(ItemRefTooltip, "SetHyperlink", ItemLink)
-			end)
-		ItemRefTooltip:SetScript("OnEnter", function() _, PawnLastHoveredItem = ItemRefTooltip.GetItem and ItemRefTooltip:GetItem() or nil end)
-		ItemRefTooltip:SetScript("OnLeave", function() PawnLastHoveredItem = nil end)
-		ItemRefTooltip:SetScript("OnMouseUp",
-			function()
-				if arg1 == "RightButton" then
-					local _, ItemLink = ItemRefTooltip.GetItem and ItemRefTooltip:GetItem() or nil
-					PawnUI_SetCompareItemAndShow(2, ItemLink)
-				end
-			end)
-	
-	-- The loot roll window
-	local LootRollClickHandler =
-		function()
-			if arg1 == "RightButton" then
-				local ItemLink = GetLootRollItemLink(this:GetParent().rollID)
-				PawnUI_SetCompareItemAndShow(2, ItemLink)
-			end
-		end
-	GroupLootFrame1IconFrame:SetScript("OnMouseUp", LootRollClickHandler)
-	GroupLootFrame2IconFrame:SetScript("OnMouseUp", LootRollClickHandler)
-	GroupLootFrame3IconFrame:SetScript("OnMouseUp", LootRollClickHandler)
-	GroupLootFrame4IconFrame:SetScript("OnMouseUp", LootRollClickHandler)
-
-	-- Some 1.12/UIPack combos don't reliably trigger our SetLootRollItem hook path.
-	-- Force a tooltip update on loot-roll icon hover after Blizzard has built the tooltip.
-	local function HookLootRollTooltipOnEnter(Frame)
-		if not Frame or Frame.PawnLootRollOnEnterHooked then return end
-		local OriginalOnEnter = Frame:GetScript("OnEnter")
-		Frame:SetScript("OnEnter", function()
-			if OriginalOnEnter then OriginalOnEnter() end
-			if this and this:GetParent() and this:GetParent().rollID then
-				PawnUpdateTooltip(GameTooltip, "SetLootRollItem", this:GetParent().rollID)
-			end
-		end)
-		Frame.PawnLootRollOnEnterHooked = true
-	end
-	HookLootRollTooltipOnEnter(GroupLootFrame1IconFrame)
-	HookLootRollTooltipOnEnter(GroupLootFrame2IconFrame)
-	HookLootRollTooltipOnEnter(GroupLootFrame3IconFrame)
-	HookLootRollTooltipOnEnter(GroupLootFrame4IconFrame)
-	
-		-- The "currently equipped" tooltips (two, in case of rings, trinkets, and dual wielding)
-		if ShoppingTooltip1 and ShoppingTooltip1.SetHyperlinkCompareItem then hooksecurefunc(ShoppingTooltip1, "SetHyperlinkCompareItem", function(ItemLink, p2, p3) PawnUpdateTooltip(ShoppingTooltip1, "SetHyperlinkCompareItem", ItemLink, p2, p3) PawnAttachIconToTooltip(ShoppingTooltip1, true) end) end
-		if ShoppingTooltip2 and ShoppingTooltip2.SetHyperlinkCompareItem then hooksecurefunc(ShoppingTooltip2, "SetHyperlinkCompareItem", function(ItemLink, p2, p3) PawnUpdateTooltip(ShoppingTooltip2, "SetHyperlinkCompareItem", ItemLink, p2, p3) PawnAttachIconToTooltip(ShoppingTooltip2, true) end) end
-		if ShoppingTooltip1 and ShoppingTooltip1.SetInventoryItem then hooksecurefunc(ShoppingTooltip1, "SetInventoryItem", function(p1, p2, p3) PawnUpdateTooltip(ShoppingTooltip1, "SetInventoryItem", p1, p2, p3) PawnAttachIconToTooltip(ShoppingTooltip1, true) end) end -- EQCompare compatibility
-		if ShoppingTooltip2 and ShoppingTooltip2.SetInventoryItem then hooksecurefunc(ShoppingTooltip2, "SetInventoryItem", function(p1, p2, p3) PawnUpdateTooltip(ShoppingTooltip2, "SetInventoryItem", p1, p2, p3) PawnAttachIconToTooltip(ShoppingTooltip2, true) end) end -- EQCompare compatibility
-	end
-	
-	-- Character Screen Hooks
-	-- PaperDollItemSlotButton_OnEnter is the main function that shows tooltips for the character screen.
-	-- Hook this to ensure PawnUpdateTooltip is called whenever a character slot is hovered.
-	if (not PawnPaperDollOnEnterHooked) and PaperDollItemSlotButton_OnEnter then
-		local original_PaperDollItemSlotButton_OnEnter = PaperDollItemSlotButton_OnEnter
-		PaperDollItemSlotButton_OnEnter = function()
-			-- First call the original function to let the tooltip build
-			original_PaperDollItemSlotButton_OnEnter()
-			
-			-- Now manually inject Pawn since standard SetInventoryItem hooks might have issues in 1.12
-			local slotId = this:GetID()
-			if (not slotId or slotId == 0) and this:GetName() then
-				local slotName = string.gsub(this:GetName(), "Character", "")
-				slotName = string.gsub(slotName, "Slot", "")
-				slotId, _, _ = GetInventorySlotInfo(slotName .. "Slot")
-			end
-
-			if slotId and slotId > 0 then
-				-- Small delay not possible in 1.12 easily, but we can try to re-run it 
-				-- if it was cleared by Atlas-TW.
-				-- Use item link directly to avoid ambiguous SetInventoryItem flows on GameTooltip.
-				local ItemLink = GetInventoryItemLink("player", slotId)
-				if ItemLink then
-					PawnUpdateTooltip(GameTooltip, "SetHyperlink", ItemLink)
-				else
-					PawnUpdateTooltip(GameTooltip, "SetInventoryItem", "player", slotId)
-				end
-				
-				-- If Atlas-TW is installed, it sometimes runs its tooltip extension AFTER OnEnter finishes.
-				-- We rely on the OnUpdate watcher (PawnPatchTooltip) to catch those cases.
-				if GameTooltip.PawnData then
-					GameTooltip.PawnData.LastMethod = "SetHyperlink"
-					GameTooltip.PawnData.LastP1 = ItemLink
-					GameTooltip.PawnData.LastP2 = nil
-					GameTooltip.PawnData.PawnLinesAdded = nil -- Force logic to check again
-					GameTooltip.PawnData.LastNumLines = GameTooltip:NumLines()
-				end
-				GameTooltip:Show()
-			end
-		end
-		PawnPaperDollOnEnterHooked = true
-	end
-	
-	-- Bag Hooks
-	-- ContainerFrameItemButton_OnEnter is the main function that shows tooltips for bag items.
-	-- Hook this to ensure PawnUpdateTooltip is called whenever a bag item is hovered, similar to character slots.
-	if (not PawnContainerOnEnterHooked) and ContainerFrameItemButton_OnEnter then
-		local original_ContainerFrameItemButton_OnEnter = ContainerFrameItemButton_OnEnter
-		ContainerFrameItemButton_OnEnter = function()
-			-- First call the original function to let the tooltip build
-			original_ContainerFrameItemButton_OnEnter()
-			
-			-- Now manually inject Pawn since standard SetBagItem hooks might have issues in 1.12
-			if this and this:GetParent() then
-				local container = this:GetParent():GetID()
-				local slot = this:GetID()
-				if container and slot then
-					PawnUpdateTooltip(GameTooltip, "SetBagItem", container, slot)
-					
-					-- Set up PawnData for OnUpdate watcher
-					if GameTooltip.PawnData then
-						GameTooltip.PawnData.LastMethod = "SetBagItem"
-						GameTooltip.PawnData.LastP1 = container
-						GameTooltip.PawnData.LastP2 = slot
-						GameTooltip.PawnData.PawnLinesAdded = nil -- Force logic to check again
-						GameTooltip.PawnData.LastNumLines = GameTooltip:NumLines()
-					end
-					GameTooltip:Show()
-				end
-			end
-		end
-		PawnContainerOnEnterHooked = true
-	end
-
-	-- Quest support on Turtle is handled by tooltip-based fallbacks in PawnPatchTooltip/PawnGetItemDataFromTooltip.
-	PawnTryHookAdditionalTooltips()
-		
-	-- MultiTips compatibility
-	if MultiTips then
-		if ItemRefTooltip2 and not ItemRefTooltip2.PawnHyperlinkHooked then VgerCore.HookInsecureFunction(ItemRefTooltip2, "SetHyperlink", function(self, ItemLink) PawnUpdateTooltip(ItemRefTooltip2, "SetHyperlink", ItemLink) PawnAttachIconToTooltip(ItemRefTooltip2, false, ItemLink) end) ItemRefTooltip2.PawnHyperlinkHooked = true end
-		if ItemRefTooltip3 and not ItemRefTooltip3.PawnHyperlinkHooked then VgerCore.HookInsecureFunction(ItemRefTooltip3, "SetHyperlink", function(self, ItemLink) PawnUpdateTooltip(ItemRefTooltip3, "SetHyperlink", ItemLink) PawnAttachIconToTooltip(ItemRefTooltip3, false, ItemLink) end) ItemRefTooltip3.PawnHyperlinkHooked = true end
-		if ItemRefTooltip4 and not ItemRefTooltip4.PawnHyperlinkHooked then VgerCore.HookInsecureFunction(ItemRefTooltip4, "SetHyperlink", function(self, ItemLink) PawnUpdateTooltip(ItemRefTooltip4, "SetHyperlink", ItemLink) PawnAttachIconToTooltip(ItemRefTooltip4, false, ItemLink) end) ItemRefTooltip4.PawnHyperlinkHooked = true end
-		if ItemRefTooltip5 and not ItemRefTooltip5.PawnHyperlinkHooked then VgerCore.HookInsecureFunction(ItemRefTooltip5, "SetHyperlink", function(self, ItemLink) PawnUpdateTooltip(ItemRefTooltip5, "SetHyperlink", ItemLink) PawnAttachIconToTooltip(ItemRefTooltip5, false, ItemLink) end) ItemRefTooltip5.PawnHyperlinkHooked = true end
-	end
-
-	PawnStaticTooltipHooksInstalled = true
-	
-	-- EquipCompare compatibility
-	PawnHookEquipCompareTooltips()
-end
-
--- Hooks EquipCompare tooltips if available.  Safe to call multiple times.
-function PawnHookEquipCompareTooltips()
-	if ComparisonTooltip1 and not ComparisonTooltip1.PawnEquipCompareHooked then
-		if ComparisonTooltip1.SetHyperlinkCompareItem then VgerCore.HookInsecureFunction(ComparisonTooltip1, "SetHyperlinkCompareItem", function(self, ItemLink) PawnUpdateTooltip(ComparisonTooltip1, "SetHyperlinkCompareItem", ItemLink) end) end
-		if ComparisonTooltip1.SetInventoryItem then VgerCore.HookInsecureFunction(ComparisonTooltip1, "SetInventoryItem", function(self, p1, p2, p3) PawnUpdateTooltip(ComparisonTooltip1, "SetInventoryItem", p1, p2, p3) end) end -- EquipCompare with CharactersViewer
-		if ComparisonTooltip1.SetHyperlink then VgerCore.HookInsecureFunction(ComparisonTooltip1, "SetHyperlink", function(self, ItemLink) PawnUpdateTooltip(ComparisonTooltip1, "SetHyperlink", ItemLink) end) end -- EquipCompare with Armory
-		ComparisonTooltip1.PawnEquipCompareHooked = true
-	end
-	if ComparisonTooltip1 and not ComparisonTooltip1.PawnEquipCompareShowHooked then
-		hooksecurefunc(ComparisonTooltip1, "Show", function()
-			if ComparisonTooltip1.GetItem then
-				local _, ItemLink = ComparisonTooltip1:GetItem()
-				if ItemLink then PawnUpdateTooltip(ComparisonTooltip1, "SetHyperlink", ItemLink) end
-			end
-			PawnScheduleEquipCompareRefresh(ComparisonTooltip1, 0.25)
-		end)
-		ComparisonTooltip1.PawnEquipCompareShowHooked = true
-	end
-	if ComparisonTooltip1 and not ComparisonTooltip1.PawnEquipCompareHideHooked then
-		hooksecurefunc(ComparisonTooltip1, "Hide", function()
-			if ComparisonTooltip1.PawnData then
-				ComparisonTooltip1.PawnData.PawnLinesAdded = nil
-				ComparisonTooltip1.PawnData.LastItemLink = nil
-			end
-		end)
-		ComparisonTooltip1.PawnEquipCompareHideHooked = true
-	end
-
-	if ComparisonTooltip2 and not ComparisonTooltip2.PawnEquipCompareHooked then
-		if ComparisonTooltip2.SetHyperlinkCompareItem then VgerCore.HookInsecureFunction(ComparisonTooltip2, "SetHyperlinkCompareItem", function(self, ItemLink) PawnUpdateTooltip(ComparisonTooltip2, "SetHyperlinkCompareItem", ItemLink) end) end
-		if ComparisonTooltip2.SetInventoryItem then VgerCore.HookInsecureFunction(ComparisonTooltip2, "SetInventoryItem", function(self, p1, p2, p3) PawnUpdateTooltip(ComparisonTooltip2, "SetInventoryItem", p1, p2, p3) end) end -- EquipCompare with CharactersViewer
-		if ComparisonTooltip2.SetHyperlink then VgerCore.HookInsecureFunction(ComparisonTooltip2, "SetHyperlink", function(self, ItemLink) PawnUpdateTooltip(ComparisonTooltip2, "SetHyperlink", ItemLink) end) end -- EquipCompare with Armory
-		ComparisonTooltip2.PawnEquipCompareHooked = true
-	end
-	if ComparisonTooltip2 and not ComparisonTooltip2.PawnEquipCompareShowHooked then
-		hooksecurefunc(ComparisonTooltip2, "Show", function()
-			if ComparisonTooltip2.GetItem then
-				local _, ItemLink = ComparisonTooltip2:GetItem()
-				if ItemLink then PawnUpdateTooltip(ComparisonTooltip2, "SetHyperlink", ItemLink) end
-			end
-			PawnScheduleEquipCompareRefresh(ComparisonTooltip2, 0.25)
-		end)
-		ComparisonTooltip2.PawnEquipCompareShowHooked = true
-	end
-	if ComparisonTooltip2 and not ComparisonTooltip2.PawnEquipCompareHideHooked then
-		hooksecurefunc(ComparisonTooltip2, "Hide", function()
-			if ComparisonTooltip2.PawnData then
-				ComparisonTooltip2.PawnData.PawnLinesAdded = nil
-				ComparisonTooltip2.PawnData.LastItemLink = nil
-			end
-		end)
-		ComparisonTooltip2.PawnEquipCompareHideHooked = true
+	local GlobalTable = getfenv and getfenv(0)
+	local BootstrapSetDefaultKeybindings = GlobalTable and GlobalTable.PawnBootstrap_SetDefaultKeybindings
+	if BootstrapSetDefaultKeybindings then
+		return BootstrapSetDefaultKeybindings()
 	end
 end
 
--- Schedules a one-shot delayed refresh for EquipCompare tooltips.
--- Useful when another addon redraws the tooltip shortly after Show().
-function PawnScheduleEquipCompareRefresh(Tooltip, Delay)
-	if not Tooltip or Tooltip.PawnEquipCompareRefreshScheduled then return end
-	Tooltip.PawnEquipCompareRefreshScheduled = true
-
-	local OriginalOnUpdate = Tooltip:GetScript("OnUpdate")
-	local Elapsed = 0
-	Tooltip:SetScript("OnUpdate", function()
-		if OriginalOnUpdate then OriginalOnUpdate() end
-		Elapsed = Elapsed + (arg1 or 0)
-		if Elapsed < (Delay or 0.25) then return end
-
-		Tooltip:SetScript("OnUpdate", OriginalOnUpdate)
-		Tooltip.PawnEquipCompareRefreshScheduled = nil
-
-		if Tooltip:IsShown() and Tooltip.GetItem then
-			local _, ItemLink = Tooltip:GetItem()
-			if ItemLink then
-				if Tooltip.PawnData then Tooltip.PawnData.PawnLinesAdded = nil end
-				PawnUpdateTooltip(Tooltip, "SetHyperlink", ItemLink)
-			end
-		end
-	end)
-end
-
--- Sets a keybinding to its default value if it's not already assigned to something else.  Returns true if anything was changed.
-function PawnSetKeybindingIfAvailable(Key, Binding)
-	-- Is this key already bound?
-	local ExistingBinding = GetBindingAction(Key)
-	if not ExistingBinding or ExistingBinding == "" then
-		-- Bind this key to its default Pawn action.
-		SetBinding(Key, Binding)
-		return true
-	else
-		-- This key is already bound, so do nothing.
-		return false
-	end
-end
-
--- Returns an empty Pawn scale table.
-function PawnGetEmptyScale()
-	return { Values = {} }
-end
-
--- Returns the default Pawn scale table.
-function PawnGetDefaultScale()
-	return 
-	{
-		["SmartGemSocketing"] = true,
-		["Values"] =
-		{
-			["Strength"] = 1,
-			["Agility"] = 1,
-			["Stamina"] = 2/3,
-			["Intellect"] = 1,
-			["Spirit"] = 1,
-			["Armor"] = 0.1,
-			["Dps"] = 3.4,
-			["ExpertiseRating"] = 0,
-			["HitRating"] = 1,
-			["CritRating"] = 1,
-			["ArmorPenetration"] = 0,
-			["SpellHitRating"] = 1,
-			["SpellCritRating"] = 1,
-			["ResilienceRating"] = 0,
-			["HasteRating"] = 0,
-			["SpellHasteRating"] = 0,
-			["Ap"] = 0.5,
-			["FeralAp"] = 0.4,
-			["Rap"] = 0.4,
-			["Mp5"] = 2.5,
-			["Hp5"] = 2.5,
-			["Mana"] = 1/15,
-			["Health"] = 1/15,
-			["BlockValue"] = 0.65,
-			["BlockRating"] = 1,
-			["DefenseRating"] = 1,
-			["DodgeRating"] = 1,
-			["ParryRating"] = 1,
-			["SpellPower"] = 6/7,
-			["SpellDamage"] = 0.4,
-			["Healing"] = 0.455,
-			["SpellPenetration"] = 0.8,
-			["FireSpellDamage"] = 0.7,
-			["ShadowSpellDamage"] = 0.7,
-			["NatureSpellDamage"] = 0.7,
-			["ArcaneSpellDamage"] = 0.7,
-			["FrostSpellDamage"] = 0.7,
-			["HolySpellDamage"] = 0.7,
-			["AllResist"] = 2.5,
-			["FireResist"] = 1,
-			["ShadowResist"] = 1,
-			["NatureResist"] = 1,
-			["ArcaneResist"] = 1,
-			["FrostResist"] = 1,
-			["RedSocket"] = 0,
-			["YellowSocket"] = 0,
-			["BlueSocket"] = 0,
-			["MetaSocket"] = 0,
-		},
-	}
-end
-
--- LinkWrangler compatibility
-function PawnLinkWranglerOnTooltip(Tooltip, ItemLink)
-	if not Tooltip then return end
-	PawnUpdateTooltip(Tooltip:GetName(), "SetHyperlink", ItemLink)
-	PawnAttachIconToTooltip(Tooltip, false, ItemLink)
-end
-
--- Hooks additional tooltip-like frames discovered at runtime.
--- Useful for UI packs that use custom tooltip frames for quest content.
-function PawnTryHookAdditionalTooltips()
-	if not getfenv then return end
-	local GlobalTable = getfenv(0)
-	if type(GlobalTable) ~= "table" then return end
-
-	local HookedCount = 0
-	for Name, Tooltip in pairs(GlobalTable) do
-		local TooltipType = type(Tooltip)
-		if type(Name) == "string" and string.find(Name, "Tooltip") and (TooltipType == "table" or TooltipType == "userdata") then
-			if Tooltip.GetScript and Tooltip.SetScript and Tooltip.GetName and Tooltip.NumLines and Tooltip.GetItem then
-				if not Tooltip.PawnHooked then
-					local OriginalOnUpdate = Tooltip:GetScript("OnUpdate")
-					Tooltip:SetScript("OnUpdate", function()
-						if OriginalOnUpdate then OriginalOnUpdate() end
-						PawnPatchTooltip(this)
-					end)
-					Tooltip.PawnHooked = true
-					HookedCount = HookedCount + 1
-				end
-			end
-		end
-	end
-
-end
-
-------------------------------------------------------------
--- Pawn core methods
-------------------------------------------------------------
-
--- If debugging is enabled, show a message; otherwise, do nothing.
-function PawnDebugMessage(Message)
-	if PawnOptions.Debug then
-		VgerCore.Message(Message)
-	end
-end
-
--- Processes an Pawn slash command.
-function PawnCommand(Command)
-	if Command == "" then
-		PawnUIShow()
-	elseif Command == PawnLocal.DebugOnCommand or Command == PawnLocal.CheckOnCommand then
-		PawnOptions.Debug = true
-		VgerCore.Message(PawnLocal.CheckOnMessage)
-		PawnResetTooltips()
-		if PawnUIFrame_DebugCheck then PawnUIFrame_DebugCheck:SetChecked(PawnOptions.Debug) end
-	elseif Command == PawnLocal.DebugOffCommand or Command == PawnLocal.CheckOffCommand then
-		PawnOptions.Debug = false
-		VgerCore.Message(PawnLocal.CheckOffMessage)
-		PawnResetTooltips()
-		if PawnUIFrame_DebugCheck then PawnUIFrame_DebugCheck:SetChecked(PawnOptions.Debug) end
-	else
-		PawnUsage()
-	end
-end
-
--- Displays Pawn usage information.
-function PawnUsage()
-	VgerCore.Message(" ")
-	VgerCore.MultilineMessage(PawnLocal.Usage)
-	VgerCore.Message(" ")
-end
-
--- Returns an empty item for use in the item cache.
-function PawnGetEmptyCachedItem(NewItemLink, NewItemName)
-	-- Also includes properties set to nil by default: Stats, SocketBonusStats, UnenchantedState, UnenchantedSocketBonusStats, Values, Level, ItemID
-	return { Name = NewItemName, UnknownLines = {}, Link = NewItemLink }
-end
-
--- Searches the item cache for an item, and either returns the correct cached item, or nil.
-function PawnGetCachedItem(ItemLink, ItemName, NumLines)
-	-- If the item cache is empty, skip all this...
-	if (not PawnItemCache) or (table.getn(PawnItemCache) == 0) then return end
-	-- If debug mode is on, the cache is disabled.
-	if PawnOptions.Debug then return end
-
-	-- Otherwise, search the item cache for this item.
-	for _, CachedItem in pairs(PawnItemCache) do
-		-- On Turtle WoW with Atlas-TW, tooltips are often modified by different addons,
-		-- leading to inconsistent NumLines. We should prioritize matching by Link or Name.
-		if ItemLink and CachedItem.Link then
-			if ItemLink == CachedItem.Link then return CachedItem end
-		elseif ItemName and CachedItem.Name then
-			if ItemName == CachedItem.Name then return CachedItem end
-		end
-	end
-end
-
--- Adds an item to the item cache, removing existing items if necessary.
-function PawnCacheItem(CachedItem)
-	-- If debug mode is on, the cache is disabled.
-	if PawnOptions.Debug then return end
-	
-	-- Cache it.
-	if PawnItemCacheMaxSize <= 0 then return end
+-- Adds an item to the cache, removing old items if necessary.
+function PawnCacheItem(Item)
 	if not PawnItemCache then PawnItemCache = {} end
-	table.insert(PawnItemCache, CachedItem)
+	table.insert(PawnItemCache, Item)
 	while table.getn(PawnItemCache) > PawnItemCacheMaxSize do
-		table.remove(PawnItemCache, 0)
+		table.remove(PawnItemCache, 1)
 	end
 end
 
@@ -946,705 +537,7 @@ function PawnGetQuestItemLinkByName(ItemName)
 	end
 end
 
--- Gets the item data for a specific item.  Retrieves the information from the cache when possible; otherwise, gets it from the tooltip specified.
--- Return value type is the same as PawnGetCachedItem.
-function PawnGetItemDataFromTooltip(TooltipName, MethodName, Param1, Param2, Param3, Param4)
-	VgerCore.Assert(TooltipName, "TooltipName must be non-null!")
-	VgerCore.Assert(MethodName, "MethodName must be non-null!")
-	if (not TooltipName) or (not MethodName) then return end
-	
-	-- First, find the tooltip.
-	local Tooltip = getglobal(TooltipName)
-	if not Tooltip then return end
-	
-	-- If we have a tooltip, try to get an item link from it.
-	local ItemLink, ItemID, ItemLevel
-	if (MethodName == "SetHyperlink") and Param1 then
-		-- Special case: if the method is SetHyperlink, then we already have an item link.
-		-- (Normally, GetItem will work, but SetHyperlink is used by some mod compatibility code.)
-		ItemLink = Param1
-	elseif (MethodName == "SetQuestItem") then
-		-- Quest dialog item tooltips may not expose links via Tooltip:GetItem() on older clients.
-		local ItemType = Param1
-		local ItemIndex = Param2
-		if type(Param1) == "table" then
-			ItemType = Param2
-			ItemIndex = Param3
-		end
-		if ItemType and ItemIndex and GetQuestItemLink then
-			ItemLink = GetQuestItemLink(ItemType, ItemIndex)
-		end
-		if (not ItemLink) and Tooltip.GetItem then
-			_, ItemLink = Tooltip:GetItem()
-		end
-	elseif (MethodName == "SetQuestLogItem") then
-		-- Quest log tooltips may pass through here without exposing links via Tooltip:GetItem().
-		local ItemType = Param1
-		local ItemIndex = Param2
-		if type(Param1) == "table" then
-			ItemType = Param2
-			ItemIndex = Param3
-		end
-		if ItemType and ItemIndex and GetQuestLogItemLink then
-			ItemLink = GetQuestLogItemLink(ItemType, ItemIndex)
-		end
-		if (not ItemLink) and Tooltip.GetItem then
-			_, ItemLink = Tooltip:GetItem()
-		end
-	elseif (MethodName == "SetLootRollItem") then
-		-- Party/raid roll tooltips often don't return a link from Tooltip:GetItem() in older clients.
-		-- For hooksecurefunc(self, ...), Param1 may be the tooltip itself and roll ID is Param2.
-		local RollID = Param1
-		if type(Param1) == "table" and Param2 then RollID = Param2 end
-		if RollID and GetLootRollItemLink then
-			ItemLink = GetLootRollItemLink(RollID)
-		end
-	elseif (MethodName == "SetLootItem") then
-		-- Loot window tooltips can similarly fail to expose links through GetItem.
-		local LootSlot = Param1
-		if type(Param1) == "table" and Param2 then LootSlot = Param2 end
-		if LootSlot and GetLootSlotLink then
-			ItemLink = GetLootSlotLink(LootSlot)
-		end
-	elseif Tooltip.GetItem then
-		_, ItemLink = Tooltip:GetItem()
-	end
-	
-	-- If we got an item link from the tooltip (or it was passed in), we can go through the simpler and more effective code that specifically
-	-- uses item links, and skip the rest of this function.
-	if ItemLink then
-		return PawnGetItemData(ItemLink)
-	end
-	
-	-- If we made it this far, then we're in the degenerate case where the tooltip doesn't have item information.  Let's look for the item's name,
-	-- and maybe we'll get lucky and find that in our item cache.
-	local ItemName, ItemNameLineNumber = PawnGetItemNameFromTooltip(TooltipName)
-	if (not ItemName) or (not ItemNameLineNumber) then return end
-
-	-- Extra fallback for quest-tooltip flows on older clients/UIPacks:
-	-- If GameTooltip has no link, try to resolve by item name via quest APIs.
-	-- Some UI packs use non-Blizzard owner names and no global Quest* OnEnter handlers.
-	if TooltipName == "GameTooltip" then
-		local OwnerName = nil
-		if Tooltip.GetOwner and Tooltip:GetOwner() and Tooltip:GetOwner().GetName then
-			OwnerName = Tooltip:GetOwner():GetName()
-		end
-
-		-- Turtle-friendly fallback: resolve link from item name via GetItemInfo, which is often
-		-- available even when quest-specific tooltip APIs/functions are missing or replaced.
-		if GetItemInfo then
-			local _, NameLink = GetItemInfo(ItemName)
-			if NameLink and PawnGetHyperlinkType(NameLink) == "item" then
-				return PawnGetItemData(NameLink)
-			end
-		end
-
-		local QuestItemLink = PawnGetQuestItemLinkByName(ItemName)
-		if QuestItemLink then
-			return PawnGetItemData(QuestItemLink)
-		end
-	end
-
-	local Item = PawnGetCachedItem(nil, ItemName)
-	if Item and Item.Values then
-		return Item
-	end
-	-- If Item is non-null but Item.Values is null, we're not done yet!
-	
-	-- Ugh, the tooltip doesn't have item information and this item isn't in the Pawn item cache, so we'll have to try to parse this tooltip.	
-	if not Item then
-		Item = PawnGetEmptyCachedItem(nil, ItemName)
-		if PawnOptions.Debug then
-			PawnDebugMessage(" ")
-			PawnDebugMessage("====================")
-			PawnDebugMessage(VgerCore.Color.Green .. ItemName)
-		end
-		
-		-- Since we don't have an item link, we have to just read stats from the original tooltip, so we only get enchanted values.
-		PawnFixStupidTooltipFormatting(TooltipName)
-		Item.Stats, Item.SocketBonusStats, Item.UnknownLines = PawnGetStatsFromTooltip(TooltipName, true)
-		if PawnOptions.Debug then
-			PawnDebugMessage(PawnLocal.FailedToGetItemLinkMessage)
-			PawnDebugMessage("Method=" .. tostring(MethodName) .. ", p1=" .. tostring(Param1) .. ", p2=" .. tostring(Param2) .. ", p3=" .. tostring(Param3))
-		end
-		
-		-- Cache this item so we don't have to re-parse next time.
-		PawnCacheItem(Item)
-	end
-	
-	-- Recalculate the scale values for the item only if necessary.
-	PawnRecalculateItemValuesIfNecessary(Item)
-	
-	return Item
-end
-
--- Returns the same information as PawnGetItemData, but based on an inventory slot index instead of an item link.
--- If requested, data for the base unenchanted item can be returned instead; otherwise, the actual item is returned.
-function PawnGetItemDataForInventorySlot(Slot, Unenchanted)
-	local ItemLink = GetInventoryItemLink("player", Slot)
-	if not ItemLink then return end
-	if Unenchanted then
-		local UnenchantedItem = PawnUnenchantItemLink(ItemLink)
-		if UnenchantedItem then ItemLink = UnenchantedItem end
-	end
-	return PawnGetItemData(ItemLink)
-end
-
--- Recalculates the scale values for a cached item if necessary, and returns them.
-function PawnRecalculateItemValuesIfNecessary(Item)
-	-- We now have stats for the item.  If values aren't already calculated for the item, calculate those.  This happens when we have
-	-- just retrieved the stats for the item, and also when the item values were cleared from the cache but not the stats.
-	if not Item.Values then
-		-- Calculate each of the values for which there are scales.
-		Item.Values = PawnGetAllItemValues(Item.Stats, Item.SocketBonusStats, Item.UnenchantedStats, Item.UnenchantedSocketBonusStats, PawnOptions.Debug)
-
-		if PawnOptions.Debug then PawnDebugMessage(" ") end
-	end
-	
-	return Item.Values
-end
-
--- Returns a single scale value (in both its enchanted and unenchanted forms) for a cached item.  Returns nil for any values that are not present.
-function PawnGetSingleValueFromItem(Item, ScaleName)
-	local ValuesTable = PawnRecalculateItemValuesIfNecessary(Item)
-	if not ValuesTable then return end
-	
-	-- The scale values are sorted alphabetically, so we need to go through the list.
-	local Count = table.getn(ValuesTable)
-	for i = 1, Count do
-		local Value = ValuesTable[i]
-		if Value[1] == ScaleName then
-			return Value[2], Value[3]
-		end
-	end
-	
-	-- It's not here; return nil.
-end
-
--- Returns true if a tooltip currently contains at least one visible Pawn scale line.
-function PawnTooltipHasPawnScaleLine(Tooltip)
-	if not Tooltip or not Tooltip.GetName then return false end
-	if not Tooltip.NumLines then return false end
-	if not PawnOptions or not PawnOptions.Scales then return false end
-
-	local TooltipName = Tooltip:GetName()
-	if not TooltipName then return false end
-
-	for i = 2, Tooltip:NumLines() do
-		local LeftLine = getglobal(TooltipName .. "TextLeft" .. i)
-		if LeftLine and LeftLine.GetText then
-			local Text = LeftLine:GetText()
-			if Text and Text ~= "" then
-				for ScaleName, Scale in pairs(PawnOptions.Scales) do
-					if not Scale.Hidden and string.find(Text, ScaleName, 1, true) then
-						return true
-					end
-				end
-			end
-		end
-	end
-
-	return false
-end
-
--- Updates a specific tooltip.
-function PawnUpdateTooltip(Tooltip, MethodName, Param1, Param2, Param3, Param4)
-	if not PawnOptions.Scales then return end
-	local TooltipName
-	if type(Tooltip) == "string" then
-		TooltipName = Tooltip
-		Tooltip = getglobal(TooltipName)
-	elseif type(Tooltip) == "table" then
-		TooltipName = Tooltip:GetName()
-	end
-
-	-- Get information for the item in this tooltip.
-	local Item = PawnGetItemDataFromTooltip(TooltipName, MethodName, Param1, Param2, Param3, Param4)
-	if not Item then return end
-	
-	-- If this is a detached or special tooltip (like AtlasLoot), we need to handle potential overwrites.
-	-- We record the last item displayed in this specific tooltip to detect if it was changed or cleared.
-	if Tooltip then
-		if not Tooltip.PawnData then Tooltip.PawnData = {} end
-		Tooltip.PawnData.LastItemLink = Item.Link
-		if MethodName == "SetQuestItem" or MethodName == "SetQuestLogItem" then
-			Tooltip.PawnData.IsQuestTooltip = true
-		elseif Tooltip == GameTooltip then
-			if Tooltip.GetOwner and Tooltip:GetOwner() and Tooltip:GetOwner().GetName then
-				local OwnerName = Tooltip:GetOwner():GetName()
-				if not OwnerName or not string.find(OwnerName, "Quest") then
-					Tooltip.PawnData.IsQuestTooltip = nil
-				end
-			else
-				Tooltip.PawnData.IsQuestTooltip = nil
-			end
-		end
-	end
-
-	-- If this is the main GameTooltip, remember the item that was hovered over.
-	if TooltipName == "GameTooltip" or (Tooltip == GameTooltip) then
-		PawnLastHoveredItem = Item.Link
-	end
-	
-	-- Now, just update the tooltip with the item data we got from the previous call.
-	if not Tooltip then
-		VgerCore.Fail("Where'd the tooltip go?  I seem to have misplaced it.")
-		return
-	end
-	
-	-- FIX: Some tooltips (like AtlasLoot) don't update properly if they've already been shown.
-	-- We force a refresh if the tooltip is empty or has been modified.
-	
-	-- Special check for AtlasLoot/Atlas-TW:
-	-- If it's the known catalog tooltip, we need to ensure the frame stays big enough.
-	if (Tooltip == AtlasLootTooltip) then
-		-- In Vanilla 1.12, AtlasLoot tends to finish its work after SetHyperlink.
-		-- We add a check for re-entry to avoid infinite loops when we re-run PawnUpdateTooltip from OnUpdate.
-		if Tooltip.UpdatingPawn then return end
-		Tooltip.UpdatingPawn = true
-		Tooltip:Show()
-		Tooltip.UpdatingPawn = nil
-	elseif (Tooltip == GameTooltip) then
-		-- Ensure GameTooltip is actually showing the changes.
-		-- In some cases, the layout doesn't recalculate properly when adding lines via OnUpdate.
-		Tooltip:Show()
-	end
-	
-	-- If necessary, add a blank line to the tooltip.
-	local AddSpace = PawnOptions.ShowSpace
-	
-	-- AtlasLoot / Catalog Check:
-	-- If we've already added Pawn lines to this tooltip for this exact item, don't do it again.
-	if Tooltip.PawnData and Tooltip.PawnData.LastItemLink == Item.Link and Tooltip.PawnData.PawnLinesAdded then
-		if not PawnTooltipHasPawnScaleLine(Tooltip) then
-			Tooltip.PawnData.PawnLinesAdded = nil
-		end
-
-		-- EquipCompare tooltips are frequently redrawn/reused for the same item link.
-		-- If we keep this flag set, Pawn can stop injecting values after the first pass.
-		if TooltipName == "ComparisonTooltip1" or TooltipName == "ComparisonTooltip2" then
-			Tooltip.PawnData.PawnLinesAdded = nil
-		else
-		-- Clear and re-inject ONLY if the tooltip was actually cleared by another addon
-		-- but for some reason NumLines matches. Otherwise, skip.
-			if Tooltip.PawnData.PawnLinesAdded then return end
-		end
-	end
-
-	-- Add the scale values to the tooltip.
-	if AddSpace and table.getn(Item.Values) > 0 then Tooltip:AddLine(" ") AddSpace = false end
-	if PawnAddValuesToTooltip then
-		PawnAddValuesToTooltip(Tooltip, Item.Values)
-	end
-	
-	-- Record that we've added lines
-	if Tooltip.PawnData then 
-		Tooltip.PawnData.PawnLinesAdded = true 
-		Tooltip.PawnData.LastMethod = MethodName
-		Tooltip.PawnData.LastP1 = Param1
-		Tooltip.PawnData.LastP2 = Param2
-		Tooltip.PawnData.LastP3 = Param3
-		Tooltip.PawnData.LastP4 = Param4
-	end
-
-	-- Record we've added these lines so we don't duplicate on next Patch check.
-	if Tooltip and Tooltip.PawnData then
-		Tooltip.PawnData.LastNumLines = Tooltip:NumLines()
-	end
-
-	-- If there were unrecognized values, annotate those lines.
-	local Annotated = false
-	if Item.UnknownLines then
-		if (PawnOptions.ShowAsterisks == PawnShowAsterisksAlways) or ((PawnOptions.ShowAsterisks == PawnShowAsterisksNonzero or PawnOptions.ShowAsterisks == PawnShowAsterisksNonzeroNoText) and (table.getn(Item.Values) > 0)) then
-			Annotated = PawnAnnotateTooltipLines(TooltipName, Item.UnknownLines)
-		end
-	end
-	-- If we annotated the tooltip for unvalued stats, display a message.
-	if (Annotated and PawnOptions.ShowAsterisks ~= PawnShowAsterisksNonzeroNoText) then
-		Tooltip:AddLine(PawnLocal.AsteriskTooltipLine, VgerCore.Color.BlueR, VgerCore.Color.BlueG, VgerCore.Color.BlueB)
-	end
-
-	-- Add the item ID to the tooltip if known.
-	if PawnOptions.ShowItemID and Item.Link then
-		-- Only show ID if AtlasLoot ID isn't already there (to avoid duplicates)
-		if not IsAddOnLoaded("AtlasLoot") or not AtlasLootOptions or not AtlasLootOptions.ShowItemID then
-			local IDs = PawnGetItemIDsForDisplay(Item.Link)
-			if IDs then
-				if PawnOptions.AlignNumbersRight then
-					Tooltip:AddDoubleLine(PawnLocal.ItemIDTooltipLine, IDs, VgerCore.Color.OrangeR, VgerCore.Color.OrangeG, VgerCore.Color.OrangeB, VgerCore.Color.OrangeR, VgerCore.Color.OrangeG, VgerCore.Color.OrangeB)
-				else
-					Tooltip:AddLine(PawnLocal.ItemIDTooltipLine .. ":  " .. IDs, VgerCore.Color.OrangeR, VgerCore.Color.OrangeG, VgerCore.Color.OrangeB)
-				end
-			end
-		end
-	end
-	-- Add the item level to the tooltip, but don't show it for items level 1 or lower.
-	if PawnOptions.ShowItemLevel and Item.Level and (Item.Level > 1) then
-		if PawnOptions.AlignNumbersRight then
-			Tooltip:AddDoubleLine(PawnLocal.ItemLevelTooltipLine,  Item.Level, VgerCore.Color.OrangeR, VgerCore.Color.OrangeG, VgerCore.Color.OrangeB, VgerCore.Color.OrangeR, VgerCore.Color.OrangeG, VgerCore.Color.OrangeB)
-		else
-			Tooltip:AddLine(PawnLocal.ItemLevelTooltipLine .. ":  " .. Item.Level, VgerCore.Color.OrangeR, VgerCore.Color.OrangeG, VgerCore.Color.OrangeB)
-		end
-	end
-	
-	-- Record the number of lines currently in the tooltip to detect later modifications.
-	if Tooltip then
-		if not Tooltip.PawnData then Tooltip.PawnData = {} end
-		Tooltip.PawnData.LastItemLink = Item.Link
-		Tooltip.PawnData.LastMethod = MethodName
-		Tooltip.PawnData.LastP1 = Param1
-		Tooltip.PawnData.LastP2 = Param2
-		Tooltip.PawnData.LastP3 = Param3
-		Tooltip.PawnData.LastP4 = Param4
-		if MethodName == "SetQuestItem" or MethodName == "SetQuestLogItem" then
-			Tooltip.PawnData.LastQuestRepairLines = nil
-			Tooltip.PawnData.LastQuestRepairLink = nil
-		end
-		-- Ensure numlines is updated AFTER all additions
-		Tooltip:Show() 
-		Tooltip.PawnData.LastNumLines = Tooltip:NumLines()
-		
-		-- If this tooltip doesn't have our update hook yet, add it.
-		-- ComparisonTooltip1/2 are managed by EquipCompare and can flicker if repeatedly patched on OnUpdate.
-		if not Tooltip.PawnHooked and TooltipName ~= "ComparisonTooltip1" and TooltipName ~= "ComparisonTooltip2" then
-			local OriginalOnUpdate = Tooltip:GetScript("OnUpdate")
-			Tooltip:SetScript("OnUpdate", function()
-				if OriginalOnUpdate then OriginalOnUpdate() end
-				PawnPatchTooltip(this)
-			end)
-			Tooltip.PawnHooked = true
-		end
-	end
-
-end
-
--- Refresh logic for tooltips that might be modified after they are shown.
--- This ensures Pawn scales stay at the bottom regardless of which addon modifies the tooltip.
-function PawnPatchTooltip(Tooltip)
-	if not Tooltip or Tooltip.UpdatingPawn then return end
-
-	local function IsQuestOwnedTooltip(TargetTooltip)
-		if not TargetTooltip or not TargetTooltip.GetOwner then return false end
-		if TargetTooltip.PawnData and TargetTooltip.PawnData.IsQuestTooltip then return true end
-		local Owner = TargetTooltip:GetOwner()
-		if not Owner or not Owner.GetName then return false end
-		local OwnerName = Owner:GetName()
-		if OwnerName and string.find(OwnerName, "Quest") then return true end
-		if TargetTooltip == GameTooltip then
-			local TooltipItemName = PawnGetItemNameFromTooltip("GameTooltip")
-			if TooltipItemName and PawnGetQuestItemLinkByName then
-				local QuestNameLink = PawnGetQuestItemLinkByName(TooltipItemName)
-				if QuestNameLink and PawnGetHyperlinkType(QuestNameLink) == "item" then
-					return true
-				end
-			end
-		end
-		return false
-	end
-
-	local function RepatchTooltip(TargetTooltip, PreferredLink)
-		if not TargetTooltip then return end
-
-		local LastMethod = TargetTooltip.PawnData and TargetTooltip.PawnData.LastMethod
-		if LastMethod == "SetQuestItem" or LastMethod == "SetQuestLogItem" then
-			local P1 = TargetTooltip.PawnData and TargetTooltip.PawnData.LastP1
-			local P2 = TargetTooltip.PawnData and TargetTooltip.PawnData.LastP2
-			local P3 = TargetTooltip.PawnData and TargetTooltip.PawnData.LastP3
-			local P4 = TargetTooltip.PawnData and TargetTooltip.PawnData.LastP4
-			if P1 and P2 then
-				PawnUpdateTooltip(TargetTooltip, LastMethod, P1, P2, P3, P4)
-				return
-			end
-		end
-
-		-- For quest-owned tooltips, avoid hyperlink fallback because it can replace
-		-- quest-specific tooltip output in Atlas-TW/UIPack flows.
-		if IsQuestOwnedTooltip(TargetTooltip) then return end
-
-		if PreferredLink and PawnGetHyperlinkType(PreferredLink) == "item" then
-			PawnUpdateTooltip(TargetTooltip, "SetHyperlink", PreferredLink)
-			return
-		end
-
-		local LastItemLink = TargetTooltip.PawnData and TargetTooltip.PawnData.LastItemLink
-		if LastItemLink and PawnGetHyperlinkType(LastItemLink) == "item" then
-			PawnUpdateTooltip(TargetTooltip, "SetHyperlink", LastItemLink)
-		end
-	end
-
-	local function AppendPawnValuesSafely(TargetTooltip, Item)
-		if not TargetTooltip or not Item or not Item.Values then return false end
-		local AddSpace = PawnOptions.ShowSpace
-		if AddSpace and table.getn(Item.Values) > 0 then TargetTooltip:AddLine(" ") end
-
-		local OriginalAlign = PawnOptions.AlignNumbersRight
-		if TargetTooltip == GameTooltip then PawnOptions.AlignNumbersRight = true end
-		PawnAddValuesToTooltip(TargetTooltip, Item.Values)
-		PawnOptions.AlignNumbersRight = OriginalAlign
-
-		if TargetTooltip.Show then TargetTooltip:Show() end
-		return true
-	end
-
-	-- Universal non-destructive repair for GameTooltip:
-	-- if Pawn lines are missing but we can resolve the visible item, append lines directly.
-	-- This avoids SetHyperlink/quest-method redraw conflicts with Atlas-TW.
-	if Tooltip == GameTooltip and not PawnTooltipHasPawnScaleLine(Tooltip) then
-		if not Tooltip.PawnData then Tooltip.PawnData = {} end
-		local CurrentLines = Tooltip:NumLines()
-		local ItemName = PawnGetItemNameFromTooltip("GameTooltip")
-		if ItemName then
-			local RepairLink = nil
-			if GetItemInfo then
-				local _, NameLink = GetItemInfo(ItemName)
-				if NameLink and PawnGetHyperlinkType(NameLink) == "item" then
-					RepairLink = NameLink
-				end
-			end
-			if (not RepairLink) and PawnGetQuestItemLinkByName then
-				local QuestNameLink = PawnGetQuestItemLinkByName(ItemName)
-				if QuestNameLink and PawnGetHyperlinkType(QuestNameLink) == "item" then
-					RepairLink = QuestNameLink
-				end
-			end
-
-			local RepairKey = RepairLink or ("name:" .. ItemName)
-			if not (Tooltip.PawnData.LastNameRepairLines == CurrentLines and Tooltip.PawnData.LastNameRepairLink == RepairKey) then
-				local Item = nil
-				if RepairLink then
-					Item = PawnGetItemData(RepairLink)
-				end
-
-				if (not Item) or (not Item.Values) then
-					Item = PawnGetCachedItem(nil, ItemName)
-					if not Item then
-						Item = PawnGetEmptyCachedItem(nil, ItemName)
-					end
-					if not Item.Values then
-						PawnFixStupidTooltipFormatting("GameTooltip")
-						Item.Stats, Item.SocketBonusStats, Item.UnknownLines = PawnGetStatsFromTooltip("GameTooltip", false)
-						PawnRecalculateItemValuesIfNecessary(Item)
-						PawnCacheItem(Item)
-					end
-				end
-
-				if Item and Item.Values then
-					Tooltip.UpdatingPawn = true
-					Tooltip.PawnData.LastNameRepairLines = CurrentLines
-					Tooltip.PawnData.LastNameRepairLink = RepairKey
-					Tooltip.PawnData.PawnLinesAdded = nil
-					AppendPawnValuesSafely(Tooltip, Item)
-					Tooltip.PawnData.LastItemLink = Item.Link or RepairLink or Tooltip.PawnData.LastItemLink
-					Tooltip.PawnData.PawnLinesAdded = true
-					Tooltip.PawnData.LastNumLines = Tooltip:NumLines()
-					Tooltip.UpdatingPawn = nil
-					return
-				end
-			end
-		end
-	end
-
-	-- Quest-owned tooltips are fragile under Atlas-TW redraws; keep them on a dedicated
-	-- quest-method repair path and avoid generic hyperlink/line-delta logic below.
-	if IsQuestOwnedTooltip(Tooltip) then
-		if not Tooltip.PawnData then return end
-
-		if PawnTooltipHasPawnScaleLine(Tooltip) then
-			Tooltip.PawnData.PawnLinesAdded = true
-			Tooltip.PawnData.LastNumLines = Tooltip:NumLines()
-			return
-		end
-
-		local CurrentLines = Tooltip:NumLines()
-		local CurrentLink = Tooltip.PawnData.LastItemLink
-		if Tooltip.PawnData.LastQuestRepairLines == CurrentLines and Tooltip.PawnData.LastQuestRepairLink == CurrentLink then
-			return
-		end
-
-		local QuestLink = CurrentLink
-		if (not QuestLink) or PawnGetHyperlinkType(QuestLink) ~= "item" then
-			local ItemName = PawnGetItemNameFromTooltip("GameTooltip")
-			if ItemName then
-				if GetItemInfo then
-					local _, NameLink = GetItemInfo(ItemName)
-					if NameLink and PawnGetHyperlinkType(NameLink) == "item" then
-						QuestLink = NameLink
-					end
-				end
-				if (not QuestLink) and PawnGetQuestItemLinkByName then
-					local ByNameLink = PawnGetQuestItemLinkByName(ItemName)
-					if ByNameLink and PawnGetHyperlinkType(ByNameLink) == "item" then
-						QuestLink = ByNameLink
-					end
-				end
-			end
-		end
-
-		if not QuestLink or PawnGetHyperlinkType(QuestLink) ~= "item" then return end
-		local Item = PawnGetItemData(QuestLink)
-		if not Item or not Item.Values then return end
-
-		Tooltip.UpdatingPawn = true
-		Tooltip.PawnData.LastQuestRepairLines = CurrentLines
-		Tooltip.PawnData.LastQuestRepairLink = QuestLink
-		Tooltip.PawnData.PawnLinesAdded = nil
-		AppendPawnValuesSafely(Tooltip, Item)
-
-		Tooltip.PawnData.LastItemLink = Item.Link or QuestLink
-		Tooltip.PawnData.PawnLinesAdded = true
-		Tooltip.PawnData.LastNumLines = Tooltip:NumLines()
-		Tooltip.UpdatingPawn = nil
-		return
-	end
-
-	local function ResolvePatchLink(TargetTooltip)
-		if not TargetTooltip then return nil, nil end
-		local LiveLink = nil
-		if TargetTooltip.GetItem then
-			_, LiveLink = TargetTooltip:GetItem()
-		end
-		if LiveLink and PawnGetHyperlinkType(LiveLink) == "item" then
-			return LiveLink, "tooltip:GetItem"
-		end
-
-		if TargetTooltip == GameTooltip then
-			local ItemName = PawnGetItemNameFromTooltip("GameTooltip")
-			if ItemName then
-				if GetItemInfo then
-					local _, NameLink = GetItemInfo(ItemName)
-					if NameLink and PawnGetHyperlinkType(NameLink) == "item" then
-						return NameLink, "GetItemInfo(name)"
-					end
-				end
-
-				local QuestItemLink = PawnGetQuestItemLinkByName(ItemName)
-				if QuestItemLink and PawnGetHyperlinkType(QuestItemLink) == "item" then
-					return QuestItemLink, "quest-name-fallback"
-				end
-			end
-		end
-
-		return nil, nil
-	end
-
-	-- Self-heal: some tooltip flows reach here without PawnData/LastItemLink initialized.
-	-- Prime from the live tooltip link so Pawn can inject instead of returning early forever.
-	if (not Tooltip.PawnData) or (not Tooltip.PawnData.LastItemLink) then
-		local LiveLink = ResolvePatchLink(Tooltip)
-		if LiveLink and PawnGetHyperlinkType(LiveLink) == "item" then
-			Tooltip.UpdatingPawn = true
-			if not Tooltip.PawnData then Tooltip.PawnData = {} end
-			Tooltip.PawnData.LastItemLink = LiveLink
-			Tooltip.PawnData.PawnLinesAdded = nil
-			RepatchTooltip(Tooltip, LiveLink)
-			Tooltip.UpdatingPawn = nil
-		end
-	end
-
-	if not Tooltip.PawnData or not Tooltip.PawnData.LastItemLink then return end
-
-	local function TooltipHasPawnScaleLine(TargetTooltip)
-		if not TargetTooltip or not TargetTooltip.GetName then return false end
-		local TooltipName = TargetTooltip:GetName()
-		if not TooltipName or not PawnOptions or not PawnOptions.Scales then return false end
-		if not TargetTooltip.NumLines then return false end
-
-		for i = 2, TargetTooltip:NumLines() do
-			local LeftLine = getglobal(TooltipName .. "TextLeft" .. i)
-			if LeftLine and LeftLine.GetText then
-				local Text = LeftLine:GetText()
-				if Text and Text ~= "" then
-					for ScaleName, Scale in pairs(PawnOptions.Scales) do
-						if not Scale.Hidden and string.find(Text, ScaleName, 1, true) then
-							return true
-						end
-					end
-				end
-			end
-		end
-		return false
-	end
-
-	-- Universal fallback: if GameTooltip has a live item link but Pawn lines are not confirmed
-	-- for that exact link, force a one-shot hyperlink update.
-	if Tooltip == GameTooltip and not IsQuestOwnedTooltip(Tooltip) then
-		local LiveLink = ResolvePatchLink(Tooltip)
-		if LiveLink and PawnGetHyperlinkType(LiveLink) == "item" then
-			local NeedsRefresh = false
-			if not Tooltip.PawnData then
-				NeedsRefresh = true
-			elseif Tooltip.PawnData.LastItemLink ~= LiveLink then
-				NeedsRefresh = true
-			elseif not Tooltip.PawnData.PawnLinesAdded then
-				NeedsRefresh = true
-			elseif not TooltipHasPawnScaleLine(Tooltip) then
-				NeedsRefresh = true
-			end
-			if NeedsRefresh then
-				Tooltip.UpdatingPawn = true
-				if not Tooltip.PawnData then Tooltip.PawnData = {} end
-				Tooltip.PawnData.LastItemLink = LiveLink
-				Tooltip.PawnData.PawnLinesAdded = nil
-				RepatchTooltip(Tooltip, LiveLink)
-				Tooltip.UpdatingPawn = nil
-			end
-		end
-	end
-	
-	-- AtlasLoot and some others set NumLines to 0 or 1 while rebuilding.
-	-- If that happens, we should reset our tracking rather than re-patching immediately.
-	local currentLines = Tooltip:NumLines()
-	
-	-- If the number of lines has changed since we last updated it, a modification occurred.
-	if currentLines ~= Tooltip.PawnData.LastNumLines then
-		-- Only re-patch if the link still matches (sanity check)
-		local _, link
-		if Tooltip.GetItem then _, link = Tooltip:GetItem() end
-		
-		-- Some quest/UI-pack tooltips can temporarily report no link while still showing
-		-- the same item. In that case, keep current item state and just sync line count.
-		if not link then
-			Tooltip.PawnData.LastNumLines = currentLines
-			return
-		end
-		
-		-- If it's a new item or tooltip was cleared, just update the count and stop.
-		if link ~= Tooltip.PawnData.LastItemLink then
-			Tooltip.PawnData.LastItemLink = link
-			Tooltip.PawnData.LastNumLines = currentLines
-			Tooltip.PawnData.PawnLinesAdded = nil
-			return
-		end
-
-		-- If the tooltip is temporarily empty (rebuilding), don't patch yet.
-		if currentLines <= 1 then
-			Tooltip.PawnData.LastNumLines = currentLines
-			Tooltip.PawnData.PawnLinesAdded = nil
-			return
-		end
-
-		-- If lines were ADDED (currentLines > LastNumLines), re-inject.
-		-- If lines were REMOVED but the item is the same, AtlasLoot probably just
-		-- finished a partial draw. We should only re-inject if we are missing.
-		if currentLines > Tooltip.PawnData.LastNumLines then
-			-- If Pawn lines are already present, another addon simply appended content.
-			-- Sync counters only; re-injecting here causes duplicate Pawn blocks.
-			if TooltipHasPawnScaleLine(Tooltip) then
-				Tooltip.PawnData.LastNumLines = currentLines
-				Tooltip.PawnData.PawnLinesAdded = true
-			else
-				Tooltip.UpdatingPawn = true
-				-- Reset duplication flag so UpdateTooltip can run once more.
-				Tooltip.PawnData.PawnLinesAdded = nil
-				RepatchTooltip(Tooltip)
-				Tooltip.UpdatingPawn = nil
-			end
-		else
-			-- Just sync the count if it somehow went down without an item change.
-			Tooltip.PawnData.LastNumLines = currentLines
-		end
-	end
-end
+-- Tooltip builder implementation moved to PawnTooltipBuilder.lua.
 
 -- Returns a sorted list of all scale values for an item (and its unenchanted version, if supplied).
 -- Parameters:
@@ -2617,6 +1510,7 @@ end
 -- Test helper: simulates a loot-window item tooltip path (SetLootItem).
 -- Usage: /run PawnTestLootSlotTooltip()
 function PawnTestLootSlotTooltip()
+	if not PawnOptions or not PawnOptions.Debug then return end
 	if not LootFrame or not LootButton1 then return end
 	if PawnTestOriginalLootButtonOnEnter == nil then
 		PawnTestOriginalLootButtonOnEnter = LootButton1:GetScript("OnEnter")
@@ -2642,6 +1536,7 @@ end
 -- Test helper: simulates a need/greed popup tooltip path (SetLootRollItem).
 -- Usage: /run PawnTestLootRollTooltip()
 function PawnTestLootRollTooltip()
+	if not PawnOptions or not PawnOptions.Debug then return end
 	if not GroupLootFrame1 or not GroupLootFrame1IconFrame then return end
 	if PawnTestOriginalLootRollOnEnter == nil then
 		PawnTestOriginalLootRollOnEnter = GroupLootFrame1IconFrame:GetScript("OnEnter")
@@ -2927,21 +1822,6 @@ function PawnGetStatValue(ScaleName, StatName)
 	return PawnOptions.Scales[ScaleName].Values[StatName]
 end
 
--- Sets the value of one stat in a scale, and returns true if successful.  Use nil or 0 as the new value to remove the stat.
-function PawnSetStatValue(ScaleName, NewValue)
-	if (not ScaleName) or (ScaleName == "") or (not StatName) or (StatName == "") then
-		VgerCore.Fail("ScaleName and StatName cannot be empty.  Usage: x = PawnGetStatValue(\"ScaleName\", \"StatName\")")
-		return nil
-	elseif not PawnOptions.Scales[ScaleName] then
-		VgerCore.Fail("ScaleName must be the name of an existing scale, and is case-sensitive.")
-		return nil
-	end
-	
-	if NewValue == 0 then NewValue = nil end
-	PawnOptions.Scales[ScaleName].Values[StatName] = NewValue
-	return true
-end
-
 -- Returns true if a particular scale exists, or false if not.
 function PawnDoesScaleExist(ScaleName)
 	if (not ScaleName) or (ScaleName == "") then
@@ -3095,13 +1975,12 @@ end
 
 -- Shows or hides the Pawn UI.
 function PawnUIShow()
+	if PawnUIController and PawnUIController.Toggle then
+		return PawnUIController:Toggle()
+	end
 	if not PawnUIFrame then
 		VgerCore.Fail("Pawn UI is not loaded!")
 		return
 	end
-	if PawnUIFrame:IsShown() then
-		PawnUIFrame:Hide()
-	else
-		PawnUIFrame:Show()
-	end
+	if PawnUIFrame:IsShown() then PawnUIFrame:Hide() else PawnUIFrame:Show() end
 end

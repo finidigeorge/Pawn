@@ -12,6 +12,20 @@ PawnUICurrentScale = nil
 PawnUICurrentListIndex = 0
 PawnUICurrentStatIndex = 0
 
+PawnUIController = PawnUIController or {}
+
+function PawnUIController:Toggle()
+	if not PawnUIFrame then
+		VgerCore.Fail("Pawn UI is not loaded!")
+		return
+	end
+	if PawnUIFrame:IsShown() then
+		PawnUIFrame:Hide()
+	else
+		PawnUIFrame:Show()
+	end
+end
+
 -- An array with indices 1 and 2 for the left and right compare items, respectively; each one is of the type returned by GetItemData.
 local PawnUIComparisonItems = {}
 -- An array with indices 1 and 2 for the first and second left side shortcut items.
