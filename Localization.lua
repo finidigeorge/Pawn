@@ -42,6 +42,7 @@ PawnStats =
 	{"Offensive physical stats"},
 	{"Attack power", "Ap", "Attack power.  Does not include attack power that you will receive from Strength or Agility."},
 	{"Armor penetration", "ArmorPenetration", "Armor penetration causes your physical attacks to ignore some of your opponent's armor."},
+	{"Vampirism", "Vampirism", "Percent of your damage dealt returned as healing."},
 	{"Ranged AP", "Rap", "Ranged attack power."},
 	{"Feral AP", "FeralAp", "Attack power in druid feral forms."},
 	{"Hit", "Hit", "Chance to hit with physical attacks."},
@@ -529,6 +530,16 @@ PawnRegexes =
 	{"^Cat's Swiftness$", "Agility", 6, PawnMultipleStatsFixed}, -- Enchantment; has additional effects
 	{"^Equip: Improves your chance to hit by (%d+)%%%.?$", "Hit"},
 	{"^Equip: Increases your chance to hit by (%d+)%%%.?$", "Hit"},
+	{"^Equip: ([%d%.,]+)%% of damage dealt is returned as healing%.?$", "Vampirism"},
+	{"^Equip: ([%d%.,]+)%% of damage you deal is returned as healing%.?$", "Vampirism"},
+	{"^Set: ([%d%.,]+)%% of damage dealt is returned as healing%.?$", "Vampirism"},
+	{"^Set: ([%d%.,]+)%% of damage you deal is returned as healing%.?$", "Vampirism"},
+	{"^equip: ([%d%.,]+)%% of damage dealt is returned as healing%.?$", "Vampirism"},
+	{"^equip: ([%d%.,]+)%% of damage you deal is returned as healing%.?$", "Vampirism"},
+	{"^set: ([%d%.,]+)%% of damage dealt is returned as healing%.?$", "Vampirism"},
+	{"^set: ([%d%.,]+)%% of damage you deal is returned as healing%.?$", "Vampirism"},
+	{"^Equip: ([%d%.,]+)%% of .-damage.- returned as healing%.?$", "Vampirism"},
+	{"^Set: ([%d%.,]+)%% of .-damage.- returned as healing%.?$", "Vampirism"},
 	{"^Set: Improves your chance to hit by (%d+)%%%.?$", "Hit"},
 	{"^Set: Increases your chance to hit by (%d+)%%%.?$", "Hit"},
 	{"^Improves your chance to hit by (%d+)%%%.?$", "Hit"},
@@ -575,6 +586,8 @@ PawnRegexes =
 	{"^%+?(%d+) [hH]ealth [eE]very 5 [sS]ec%.?$", "Hp5"}, -- Aquamarine Signet of Regeneration
 	{"^%+?(%d+) [hH]ealth [pP]er 5 [sS]ec%.?$", "Hp5"}, -- Anglesite Choker of Regeneration
 	{"^Vitality$", "Mp5", 4, PawnMultipleStatsFixed, "Hp5", 4, PawnMultipleStatsFixed}, -- boots enchantment
+	{"^Reinforced Armor %+(%d+)%/%+(%d+) Stamina%.?$", "Armor", 1, PawnMultipleStatsExtract, "Stamina", 2, PawnMultipleStatsExtract}, -- Turtle armor kits: "Reinforced Armor +32/+4 Stamina"
+	{"^reinforced armor %+(%d+)%/%+(%d+) stamina%.?$", "Armor", 1, PawnMultipleStatsExtract, "Stamina", 2, PawnMultipleStatsExtract},
 	{"^%+(%d+) Mana$", "Mana"}, -- +150 mana enchantment
 	{"^%+(%d+) HP$", "Health"}, -- +100 health head/leg enchantment
 	{"^%+(%d+) Health$", "Health"}, -- +150 health enchantment
