@@ -1466,6 +1466,18 @@ function PawnCorrectScaleErrors(ScaleName)
 	
 	-- Some versions of Pawn call resilience rating Resilience and some call it ResilienceRating.
 	PawnReplaceStat(ThisScale, "Resilience", "ResilienceRating")
+
+	-- Standardize legacy rating-style names to Vanilla/Turtle stat keys.
+	PawnReplaceStat(ThisScale, "HitRating", "Hit")
+	PawnReplaceStat(ThisScale, "CritRating", "Crit")
+	PawnReplaceStat(ThisScale, "SpellHitRating", "SpellHit")
+	PawnReplaceStat(ThisScale, "SpellCritRating", "SpellCrit")
+	PawnReplaceStat(ThisScale, "HasteRating", "Haste")
+	PawnReplaceStat(ThisScale, "SpellHasteRating", "SpellHaste")
+	PawnReplaceStat(ThisScale, "DefenseRating", "Defense")
+	PawnReplaceStat(ThisScale, "BlockRating", "Block")
+	PawnReplaceStat(ThisScale, "DodgeRating", "Dodge")
+	PawnReplaceStat(ThisScale, "ParryRating", "Parry")
 	
 	-- Early versions of Pawn 0.7.x had a typo in the configuration UI so that none of the special DPS stats worked.
 	PawnReplaceStat(ThisScale, "MeleeDPS", "MeleeDps")
