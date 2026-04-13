@@ -1347,6 +1347,17 @@ end
 -- Possible values include: item, enchant, quest, spell
 function PawnGetHyperlinkType(Hyperlink)
 	if not Hyperlink then return end
+			if type(Hyperlink) == "table" then
+		if Hyperlink.GetItem then
+			local _, ItemLink = Hyperlink:GetItem()
+			Hyperlink = ItemLink
+		elseif Hyperlink.Link then
+			Hyperlink = Hyperlink.Link
+		else
+			return
+		end
+	end
+	if type(Hyperlink) ~= "string" then return end
 	-- First, try colored links.
 	local _, _, LinkType = string.find(Hyperlink, "^|c%x%x%x%x%x%x%x%x|H(.-):")
 	if not LinkType then
@@ -1359,6 +1370,7 @@ end
 -- If the item link is of the clickable form, strip off the initial hyperlink portion.
 function PawnStripLeftOfItemLink(ItemLink)
 	if not ItemLink then return end
+	if type(ItemLink) ~= "string" then return end
 	local _, _, InnerLink = string.find(ItemLink, "^|c%x+|H(.-)|h")
 	if InnerLink then return InnerLink end
 	-- Support for raw item:1234 strings

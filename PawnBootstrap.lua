@@ -242,6 +242,9 @@ end
 
 -- Once per new version of Pawn that adds keybindings, bind the new actions to default keys.
 function PawnBootstrap_SetDefaultKeybindings()
+	-- On some clients/UI packs, UPDATE_BINDINGS can fire before saved variables load.
+	if not PawnOptions then return false end
+
 	if PawnOptions.LastKeybindingsSet == nil  then PawnOptions.LastKeybindingsSet = 0 end
 	local BindingSet = false
 
@@ -253,7 +256,14 @@ function PawnBootstrap_SetDefaultKeybindings()
 	end
 
 	-- If any keybindings were changed, save the user's bindings.
-	if BindingSet and SaveBindings and GetCurrentBindingSet then SaveBindings(GetCurrentBindingSet()) end
+	if BindingSet and SaveBindings then
+		if GetCurrentBindingSet then
+			local Current = GetCurrentBindingSet()
+			if Current == 1 or Current == 2 then
+				SaveBindings(Current)
+			end
+		end
+	end
 
 	-- Record that we've set those keybindings, so we don't try to set them again in the future, even if
 	-- the user clears them.

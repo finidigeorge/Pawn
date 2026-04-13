@@ -251,7 +251,7 @@ end
 
 -- Updates a specific tooltip.
 function PawnUpdateTooltip(Tooltip, MethodName, Param1, Param2, Param3, Param4)
-	if not PawnOptions.Scales then return end
+	if not PawnOptions or not PawnOptions.Scales then return end
 	local TooltipName
 	if type(Tooltip) == "string" then
 		TooltipName = Tooltip
@@ -260,6 +260,8 @@ function PawnUpdateTooltip(Tooltip, MethodName, Param1, Param2, Param3, Param4)
 		TooltipName = Tooltip:GetName()
 	end
 
+
+	
 	-- Get information for the item in this tooltip.
 	local Item = PawnGetItemDataFromTooltip(TooltipName, MethodName, Param1, Param2, Param3, Param4)
 	if not Item then return end
