@@ -1614,6 +1614,26 @@ function PawnToggleTooltipIcons()
 	PawnAttachIconToTooltip(ComparisonTooltip2, true)
 end
 
+-- Gets an icon texture path for an item link across client variants.
+function PawnGetItemIconTexture(ItemLink)
+	if not ItemLink then return end
+
+	if GetItemIcon then
+		return GetItemIcon(ItemLink)
+	end
+
+	if GetItemInfo then
+		local _, _, _, _, _, _, _, _, _, TextureName = GetItemInfo(ItemLink)
+		if TextureName then return TextureName end
+
+		local ItemID = PawnGetItemIDFromLink(ItemLink)
+		if ItemID then
+			local _, _, _, _, _, _, _, _, _, TextureByID = GetItemInfo("item:" .. ItemID)
+			if TextureByID then return TextureByID end
+		end
+	end
+end
+
 -- If tooltip icons are enabled, attaches an icon to the upper-left corner of a tooltip.  Otherwise, hides
 -- any icons attached to that tooltip if they exist.
 -- Optionally, the caller may include an item link so this function doesn't need to get one.
@@ -1629,7 +1649,7 @@ function PawnAttachIconToTooltip(Tooltip, AttachAbove, ItemLink)
 			_, ItemLink = Tooltip:GetItem()
 		end
 		if ItemLink then
-			TextureName = GetItemIcon(ItemLink)
+			TextureName = PawnGetItemIconTexture(ItemLink)
 		end
 	end
 	
