@@ -171,6 +171,8 @@ function PawnGetItemDataFromTooltip(TooltipName, MethodName, Param1, Param2, Par
 		end
 		
 		-- Cache this item so we don't have to re-parse next time.
+		-- Only cache if we found recognizable stats; otherwise this is a non-item tooltip (e.g. a spell).
+		if not Item.Stats or not next(Item.Stats) then return nil end
 		PawnCacheItem(Item)
 	end
 	
@@ -504,8 +506,8 @@ function PawnPatchTooltip(Tooltip)
 					end
 					if not Item.Values then
 						PawnFixStupidTooltipFormatting("GameTooltip")
-						Item.Stats, Item.SocketBonusStats, Item.UnknownLines = PawnGetStatsFromTooltip("GameTooltip", false)
-						PawnRecalculateItemValuesIfNecessary(Item)
+						Item.Stats, Item.SocketBonusStats, Item.UnknownLines = PawnGetStatsFromTooltip("GameTooltip", false)							-- If no recognizable stats were found, this is not an equipment tooltip (e.g. a spell or ability).
+							if not Item.Stats or not next(Item.Stats) then return end						PawnRecalculateItemValuesIfNecessary(Item)
 						PawnCacheItem(Item)
 					end
 				end
