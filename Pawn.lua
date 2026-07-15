@@ -1617,6 +1617,8 @@ end
 -- Gets an icon texture path for an item link across client variants.
 function PawnGetItemIconTexture(ItemLink)
 	if not ItemLink then return end
+	-- Attempt to guard processing for actual item links
+	if PawnGetHyperlinkType(ItemLink) ~= "item" then return end
 
 	if GetItemIcon then
 		return GetItemIcon(ItemLink)
