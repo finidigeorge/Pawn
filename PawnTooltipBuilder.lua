@@ -326,9 +326,10 @@ function PawnUpdateTooltip(Tooltip, MethodName, Param1, Param2, Param3, Param4)
 			Tooltip.PawnData.PawnLinesAdded = nil
 		end
 
-		-- EquipCompare tooltips are frequently redrawn/reused for the same item link.
+		-- EquipCompare and ShaguTweaks compare tooltips are frequently redrawn/reused for the same item link.
 		-- If we keep this flag set, Pawn can stop injecting values after the first pass.
-		if TooltipName == "ComparisonTooltip1" or TooltipName == "ComparisonTooltip2" then
+		if TooltipName == "ComparisonTooltip1" or TooltipName == "ComparisonTooltip2"
+			or TooltipName == "ShoppingTooltip1" or TooltipName == "ShoppingTooltip2" then
 			Tooltip.PawnData.PawnLinesAdded = nil
 		else
 		-- Clear and re-inject ONLY if the tooltip was actually cleared by another addon

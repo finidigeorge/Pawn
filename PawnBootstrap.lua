@@ -356,11 +356,67 @@ function PawnBootstrap_SetDefaultKeybindings()
 		HookLootRollTooltipOnEnter(GroupLootFrame3IconFrame)
 		HookLootRollTooltipOnEnter(GroupLootFrame4IconFrame)
 
-		-- The "currently equipped" tooltips
-		if ShoppingTooltip1 and ShoppingTooltip1.SetHyperlinkCompareItem then hooksecurefunc(ShoppingTooltip1, "SetHyperlinkCompareItem", function(ItemLink, p2, p3) PawnUpdateTooltip(ShoppingTooltip1, "SetHyperlinkCompareItem", ItemLink, p2, p3) PawnAttachIconToTooltip(ShoppingTooltip1, true) end) end
-		if ShoppingTooltip2 and ShoppingTooltip2.SetHyperlinkCompareItem then hooksecurefunc(ShoppingTooltip2, "SetHyperlinkCompareItem", function(ItemLink, p2, p3) PawnUpdateTooltip(ShoppingTooltip2, "SetHyperlinkCompareItem", ItemLink, p2, p3) PawnAttachIconToTooltip(ShoppingTooltip2, true) end) end
-		if ShoppingTooltip1 and ShoppingTooltip1.SetInventoryItem then hooksecurefunc(ShoppingTooltip1, "SetInventoryItem", function(p1, p2, p3) PawnUpdateTooltip(ShoppingTooltip1, "SetInventoryItem", p1, p2, p3) PawnAttachIconToTooltip(ShoppingTooltip1, true) end) end
-		if ShoppingTooltip2 and ShoppingTooltip2.SetInventoryItem then hooksecurefunc(ShoppingTooltip2, "SetInventoryItem", function(p1, p2, p3) PawnUpdateTooltip(ShoppingTooltip2, "SetInventoryItem", p1, p2, p3) PawnAttachIconToTooltip(ShoppingTooltip2, true) end) end
+		-- ShaguTweaks equip-compare support.
+		-- ShaguTweaks calls SetInventoryItem → Show → AddHeader → Show on ShoppingTooltip1/2 every frame.
+		-- OnUpdate ordering is unreliable, so instead we shadow the Show method in the Lua table.
+		-- Lua calls like ShoppingTooltip1:Show() look up Show in the Lua table first, finding our wrapper.
+		-- We inject Pawn lines synchronously inside the second Show() call (after AddHeader has run),
+		-- detected by line 1 being gray (0.5,0.5,0.5 = "Currently Equipped" header color).
+		local function PawnHookShaguTooltipShow(Tooltip)
+			if not Tooltip or Tooltip.PawnShaguShowHooked then return end
+			local tooltipName = Tooltip:GetName()
+
+			-- Capture the C-level Show via metamethod before we shadow it in the Lua table.
+			local cShow = Tooltip.Show
+
+			Tooltip.Show = function(self)
+				cShow(self)  -- call the real C Show first so the tooltip visually updates
+
+				if Tooltip.PawnShaguUpdating then return end
+
+				local line1 = getglobal(tooltipName .. "TextLeft1")
+				if not line1 then return end
+				local r, g, b = line1:GetTextColor()
+				-- AddHeader sets line 1 to gray (0.5,0.5,0.5). Skip the pre-AddHeader Show call.
+				if not r or r > 0.55 or g > 0.55 or b > 0.55 then return end
+				if PawnTooltipHasPawnScaleLine(Tooltip) then return end
+
+				local line2 = getglobal(tooltipName .. "TextLeft2")
+				local itemName = line2 and line2:GetText()
+				if not itemName or itemName == "" then return end
+
+				-- Cache item link by name; rescan inventory only when the item changes.
+				if itemName ~= Tooltip.PawnShaguLastName then
+					Tooltip.PawnShaguLastName = itemName
+					Tooltip.PawnShaguLastLink = nil
+					for slotID = 1, 19 do
+						local link = GetInventoryItemLink("player", slotID)
+						if link then
+							local _, _, name = string.find(link, "%[(.-)%]")
+							if name == itemName then
+								Tooltip.PawnShaguLastLink = link
+								break
+							end
+						end
+					end
+				end
+
+				local itemLink = Tooltip.PawnShaguLastLink
+				if not itemLink then return end
+
+				-- Inject Pawn lines. Guard against re-entry since PawnUpdateTooltip calls Show().
+				Tooltip.PawnShaguUpdating = true
+				if not Tooltip.PawnData then Tooltip.PawnData = {} end
+				Tooltip.PawnData.LastItemLink = itemLink
+				Tooltip.PawnData.PawnLinesAdded = nil
+				PawnUpdateTooltip(Tooltip, "SetHyperlink", itemLink)
+				Tooltip.PawnShaguUpdating = nil
+			end
+
+			Tooltip.PawnShaguShowHooked = true
+		end
+		PawnHookShaguTooltipShow(ShoppingTooltip1)
+		PawnHookShaguTooltipShow(ShoppingTooltip2)
 	end
 
 	local PaperDollHooked = PawnInternal and PawnInternal.GetPaperDollOnEnterHooked and PawnInternal.GetPaperDollOnEnterHooked()

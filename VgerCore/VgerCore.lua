@@ -119,7 +119,7 @@ function VgerCore.MultilineMessage(Text, Color)
 	local Line
 	local ColorString = Color
 	if not ColorString then ColorString = "" end
-	for Line in string.gmatch(Text, "[^\r\n]+") do
+	for Line in string.gfind(Text, "[^\r\n]+") do
 		VgerCore.Message(ColorString .. Line)
 	end
 end
@@ -223,7 +223,7 @@ function VgerCore.RunMacro(MacroName)
 
 	-- Then, execute each line individually.  Ignore comments marked with # or -.
 	local Line
-	for Line in string.gmatch(Script, "[^\n]+") do
+	for Line in string.gfind(Script, "[^\n]+") do
 		local FirstChar = string.sub(Line, 1, 1)
 		if FirstChar ~= "#" and FirstChar ~= "-" then
 			VgerCore.ExecuteChatCommand(Line)
