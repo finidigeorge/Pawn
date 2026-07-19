@@ -417,7 +417,7 @@ PawnIgnoreNames =
 -- them through the normal gauntlet of expressions.
 PawnNormalizationRegexes =
 {
-	{"^Set: ", ""}, -- Strip "Set: " from the start of lines to allow raw stat parsing
+	{"^Set: ", "Equip: "}, -- Normalize "Set: " to "Equip: " so set bonus lines match existing Equip: regexes
 	{"^([%w%s%.]+) %+(%d+)$", "+%2 %1"}, -- "Stamina +5" --> "+5 Stamina"
 	{"^(.-)|r.*", "%1"}, -- For removing meta gem requirements
 }
@@ -447,6 +447,8 @@ PawnRegexes =
 	{"^ItemID:"}, -- Turtle WoW item ID line added by SellValue/tooltip addons
 	{"^Sells for"}, -- Turtle WoW sell price line
 	{"^Value:"}, -- Turtle WoW value line
+	{"^%(%d+%) Set:"}, -- Inactive set bonus e.g. "(4) Set: +10 Intellect."
+	{"^Equip: Increases your attack and casting speed by"}, -- % speed bonus, not a numeric stat Pawn tracks (Set: normalized to Equip:)
 	
 	-- ========================================
 	-- Common strings that are ignored (rare ones are at the bottom of the file)
@@ -559,6 +561,7 @@ PawnRegexes =
 	{"^Equip: Increases your chance to hit with spells by (%d+)%%%.?$", "SpellHit"},
 	{"^Equip: Improves your chance to get a critical strike with spells by (%d+)%%%.?$", "SpellCrit"},
 	{"^Equip: Increases your chance to get a critical strike with spells by (%d+)%%%.?$", "SpellCrit"},
+	{"^Equip: Improves your chance to get a critical strike with .+ spells by (%d+)%%%.?$", "SpellCrit"}, -- e.g. "with all Shock spells", "with Nature spells"
 	{"^Equip: Increases your chance to dodge an attack by (%d+)%%%.?$", "Dodge"},
 	{"^Equip: Improves your chance to dodge an attack by (%d+)%%%.?$", "Dodge"},
 	{"^Equip: Increases your chance to parry an attack by (%d+)%%%.?$", "Parry"},
@@ -582,6 +585,7 @@ PawnRegexes =
 	{"^Equip: Increases ranged attack power by (%d+)%.$", "Rap"},
 	{"^Savagery$", "Ap", 70, PawnMultipleStatsFixed}, -- weapon enchantment
 	{"^Equip: Restores (%d+) mana per 5 sec%.$", "Mp5"},
+	{"^Equip: Your Lightning Shield spell also grants you (%d+) mana per 5 sec%..*$", "Mp5"}, -- Earthshatterer (8) Set
 	{"^%+?(%d+) Mana Regen$", "Mp5"}, -- Shoulder enchantment, Scryers?
 	{"^Mana Regen (%d+) per 5 sec%.$", "Mp5"},
 	{"^%+?(%d+) [mM]ana [pP]er 5 [sS]ec%.?$", "Mp5"}, 
@@ -619,6 +623,8 @@ PawnRegexes =
 	{"^%+?(%d+) Spell Damage and Healing$", "SpellDamage", 1, PawnMultipleStatsExtract, "Healing", 1, PawnMultipleStatsExtract},
 	{"^%+?(%d+) Damage and Healing Spells$", "SpellDamage", 1, PawnMultipleStatsExtract, "Healing", 1, PawnMultipleStatsExtract},
 	{"^Equip: Increases healing done by up to (%d+) and damage done by up to (%d+) for all magical spells and effects%.$", "Healing", 1, PawnMultipleStatsExtract, "SpellDamage", 2, PawnMultipleStatsExtract},
+	{"^Equip: Increases healing done by spells and effects by up to (%d+)%.$", "Healing", 1, PawnMultipleStatsExtract},
+	{"^Equip: Increases healing done by up to (%d+)%.$", "Healing", 1, PawnMultipleStatsExtract},
 	{"^%+?(%d+) Healing$", "Healing"},
 	{"^%+?(%d+) Healing %+?(%d+) Spell Damage$", "Healing", 1, PawnMultipleStatsExtract, "SpellDamage", 2, PawnMultipleStatsExtract},
 	{"^%+?(%d+) Healing and %+?(%d+) Spell Damage$", "Healing", 1, PawnMultipleStatsExtract, "SpellDamage", 2, PawnMultipleStatsExtract},
@@ -626,6 +632,7 @@ PawnRegexes =
 	{"^%+?(%d+) Healing Spells$", "Healing", 1, PawnMultipleStatsExtract}, -- Turtle WoW tooltip format
 	{"^Equip: Increases your spell penetration by (%d+)%.$", "SpellPenetration"}, -- Frostfire Robe
 	{"^%+?(%d+) Spell Penetration$", "SpellPenetration"}, -- Radiant Talasite
+	{"^Equip: Decreases the magical resistances of your spell targets by (%d+)%.$", "SpellPenetration"}, -- Arcanist Regalia (5) Set
 	{"^%+(%d+) Fire Damage$", "FireSpellDamage"},
 	{"^%+(%d+) Fire Spell Damage$", "FireSpellDamage"},
 	{"^Equip: Increases damage done by Fire spells and effects by up to (%d+)%.$", "FireSpellDamage"},

@@ -465,7 +465,7 @@ function PawnGetItemData(ItemLink)
 		end
 		
 		-- First the enchanted stats.
-		Item.Stats, Item.SocketBonusStats, Item.UnknownLines, Item.PrettyLink = PawnGetStatsFromTooltipWithMethod("PawnPrivateTooltip", true, "SetHyperlink", Item.Link)
+		Item.Stats, Item.SocketBonusStats, Item.UnknownLines, Item.PrettyLink, Item.SetBonusStats = PawnGetStatsFromTooltipWithMethod("PawnPrivateTooltip", true, "SetHyperlink", Item.Link)
 
 		-- Then, the unenchanted stats.  But, we only need to do this if the item is enchanted or socketed.  PawnUnenchantItemLink
 		-- will return nil if the item isn't enchanted, so we can skip that process.
@@ -645,6 +645,32 @@ function PawnAddValuesToTooltip(Tooltip, ItemValues, OnlyFirstValue)
 	end
 end
 
+-- Adds set bonus scale values to a tooltip, prefixed with "Set: " to distinguish from base item stats.
+-- Parameters: Tooltip, SetBonusValues
+function PawnAddSetBonusValuesToTooltip(Tooltip, SetBonusValues)
+	if not SetBonusValues then return end
+	for _, Entry in pairs(SetBonusValues) do
+		local ScaleName, Value = Entry[1], Entry[2]
+		if Value and Value > 0 then
+			local Scale = PawnOptions.Scales[ScaleName]
+			if Scale and not Scale.Hidden then
+				local TextColor = VgerCore.Color.Blue
+				if Scale.Color and string.len(Scale.Color) == 6 then TextColor = "|cff" .. Scale.Color end
+				local DisplayName = "Set: " .. ScaleName
+				local TooltipText = string.format(PawnUnenchantedAnnotationFormat, TextColor, DisplayName, Value)
+				if PawnOptions.AlignNumbersRight then
+					local Pos = string.find(TooltipText, ":")
+					local Left = string.sub(TooltipText, 0, Pos - 1)
+					local Right = string.sub(TooltipText, 0, 10) .. string.sub(TooltipText, Pos + 3)
+					Tooltip:AddDoubleLine(Left, Right)
+				else
+					Tooltip:AddLine(TooltipText)
+				end
+			end
+		end
+	end
+end
+
 -- Returns the total scale values of all equipped items.  Only counts enchanted values.
 -- Parameters: UnitName
 --		UnitName: The name of the unit from whom the inventory item should be retrieved.  Defaults to "player".
@@ -809,7 +835,7 @@ end
 --		UnknownLines: A list of lines in the tooltip that were not understood.
 --		PrettyLink: A beautified item link, if available.
 function PawnGetStatsFromTooltip(TooltipName, DebugMessages)
-	local Stats, SocketBonusStats, UnknownLines = {}, {}, {}
+	local Stats, SocketBonusStats, UnknownLines, SetBonusStats = {}, {}, {}, {}
 	local HadUnknown = false
 	local SocketBonusIsValid = false
 	local Tooltip = getglobal(TooltipName)
@@ -832,6 +858,7 @@ function PawnGetStatsFromTooltip(TooltipName, DebugMessages)
 	end
 	
 	-- Now, read the tooltip for stats.
+	local InSetPieceList = false  -- true while scanning indented set piece names, false once we hit a "Set:" bonus line
 	for i = ItemNameLineNumber + 1, Tooltip:NumLines() do
 		local LeftLine = getglobal(TooltipName .. "TextLeft" .. i)
 		local LeftLineText = LeftLine:GetText()
@@ -848,6 +875,37 @@ function PawnGetStatsFromTooltip(TooltipName, DebugMessages)
 			end
 		end
 		if IsKillLine then break end
+
+		-- Skip set piece name lines and active set bonus lines.
+		-- The set header looks like "Name (N/N)"; after it comes a list of indented piece names,
+		-- then "Set: ..." active bonus lines.  We skip all of those since the bonus applies to all
+		-- pieces equally and cannot be meaningfully attributed to one item.
+		local SkipThisLine = false
+		if string.find(LeftLineText, " %(%-?%d+/%-?%d+%)$") then
+			InSetPieceList = true
+			SkipThisLine = true  -- skip the set header line itself too
+		elseif InSetPieceList then
+			if string.sub(LeftLineText, 1, 4) == "Set:" or string.sub(LeftLineText, 1, 4) == "set:"
+				or string.sub(LeftLineText, 1, 6) == "Equip:" or string.sub(LeftLineText, 1, 4) == "Use:"
+				or string.sub(LeftLineText, 1, 1) == "+" or string.sub(LeftLineText, 1, 1) == "-"
+				or LeftLineText == "" then
+				InSetPieceList = false
+				-- Active set bonus lines (Set:) are parsed into SetBonusStats, not skipped
+				if string.sub(LeftLineText, 1, 4) == "Set:" or string.sub(LeftLineText, 1, 4) == "set:" then
+					PawnLookForSingleStat(PawnRegexes, SetBonusStats, LeftLineText, DebugMessages)
+					SkipThisLine = true
+				end
+			else
+				-- Still in the set piece name list; skip this line silently.
+				if DebugMessages then PawnDebugMessage(VgerCore.Color.Blue .. "Skipping set piece name: " .. LeftLineText) end
+				SkipThisLine = true
+			end
+		elseif string.sub(LeftLineText, 1, 4) == "Set:" or string.sub(LeftLineText, 1, 4) == "set:" then
+			-- Standalone active set bonus line (no preceding header on this tooltip scan)
+			PawnLookForSingleStat(PawnRegexes, SetBonusStats, LeftLineText, DebugMessages)
+			SkipThisLine = true
+		end
+		if not SkipThisLine then
 		
 		for Side = 1, 2 do
 			local CurrentParseText, RegexTable, CurrentDebugMessages, IgnoreErrors
@@ -962,21 +1020,24 @@ function PawnGetStatsFromTooltip(TooltipName, DebugMessages)
 				end -- (if not IgnoreLine...)
 			end
 		end
-	end
+		end -- (if not SkipThisLine)
+	end -- (for i)
 
 	-- Before returning, some stats require special handling.
-	
-	if Stats["IsMainHand"] or Stats["IsOneHand"] or Stats["IsOffHand"] or Stats["IsTwoHand"] or Stats["IsRanged"] then
-		-- Only perform this conversion if this is an actual weapon.  This works around a problem that occurs when you
-		-- enchant your ring with weapon damage and then Pawn would try to calculate DPS for your ring with no Min/MaxDamage.
-		if Stats["MinDamage"] and Stats["MaxDamage"] and Stats["Speed"] then
-			PawnAddStatToTable(Stats, "Dps", (Stats["MinDamage"] + Stats["MaxDamage"]) / Stats["Speed"] / 2)
-		else
-			local WeaponStats = 0
-			if Stats["MinDamage"] then WeaponStats = WeaponStats + 1 end
-			if Stats["MaxDamage"] then WeaponStats = WeaponStats + 1 end
-			if Stats["Speed"] then WeaponStats = WeaponStats + 1 end
-			VgerCore.Assert(WeaponStats == 0 or WeaponStats == 3, "Weapon with mismatched or missing speed and damage stats was not converted to DPS")
+
+	if Stats["MinDamage"] and Stats["MaxDamage"] and Stats["Speed"] then
+		PawnAddStatToTable(Stats, "Dps", (Stats["MinDamage"] + Stats["MaxDamage"]) / Stats["Speed"] / 2)
+	else
+		local WeaponStats = 0
+		if Stats["MinDamage"] then WeaponStats = WeaponStats + 1 end
+		if Stats["MaxDamage"] then WeaponStats = WeaponStats + 1 end
+		if Stats["Speed"] then WeaponStats = WeaponStats + 1 end
+		if WeaponStats ~= 0 and WeaponStats ~= 3 then
+			-- Partial weapon stats (e.g. from a set bonus "+X weapon damage" line without speed).
+			-- Can't compute DPS; discard the partial stats to avoid downstream errors.
+			Stats["MinDamage"] = nil
+			Stats["MaxDamage"] = nil
+			Stats["Speed"] = nil
 		end
 	end
 	
@@ -1056,7 +1117,7 @@ function PawnGetStatsFromTooltip(TooltipName, DebugMessages)
 	local _, PrettyLink
 	if Tooltip.GetItem then _, PrettyLink = Tooltip:GetItem() end
 	if not HadUnknown then UnknownLines = nil end
-	return Stats, SocketBonusStats, UnknownLines, PrettyLink
+	return Stats, SocketBonusStats, UnknownLines, PrettyLink, SetBonusStats
 end
 
 -- Looks for a single string in the regex table, and adds it to the stats table if it finds it.

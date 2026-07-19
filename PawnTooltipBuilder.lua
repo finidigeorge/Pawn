@@ -164,7 +164,7 @@ function PawnGetItemDataFromTooltip(TooltipName, MethodName, Param1, Param2, Par
 		
 		-- Since we don't have an item link, we have to just read stats from the original tooltip, so we only get enchanted values.
 		PawnFixStupidTooltipFormatting(TooltipName)
-		Item.Stats, Item.SocketBonusStats, Item.UnknownLines = PawnGetStatsFromTooltip(TooltipName, true)
+		Item.Stats, Item.SocketBonusStats, Item.UnknownLines, _, Item.SetBonusStats = PawnGetStatsFromTooltip(TooltipName, true)
 		if PawnOptions.Debug then
 			PawnDebugMessage(PawnLocal.FailedToGetItemLinkMessage)
 			PawnDebugMessage("Method=" .. tostring(MethodName) .. ", p1=" .. tostring(Param1) .. ", p2=" .. tostring(Param2) .. ", p3=" .. tostring(Param3))
@@ -201,8 +201,16 @@ function PawnRecalculateItemValuesIfNecessary(Item)
 	if not Item.Values then
 		-- Calculate each of the values for which there are scales.
 		Item.Values = PawnGetAllItemValues(Item.Stats, Item.SocketBonusStats, Item.UnenchantedStats, Item.UnenchantedSocketBonusStats, PawnOptions.Debug)
-
 		if PawnOptions.Debug then PawnDebugMessage(" ") end
+	end
+
+	-- Compute set bonus values separately (may be populated after Values was already cached).
+	if Item.SetBonusValues == nil then
+		if Item.SetBonusStats and next(Item.SetBonusStats) then
+			Item.SetBonusValues = PawnGetAllItemValues(Item.SetBonusStats, nil, nil, nil, false)
+		else
+			Item.SetBonusValues = false  -- false = computed and empty, to avoid re-running next hover
+		end
 	end
 	
 	return Item.Values
@@ -342,6 +350,11 @@ function PawnUpdateTooltip(Tooltip, MethodName, Param1, Param2, Param3, Param4)
 	if AddSpace and table.getn(Item.Values) > 0 then Tooltip:AddLine(" ") AddSpace = false end
 	if PawnAddValuesToTooltip then
 		PawnAddValuesToTooltip(Tooltip, Item.Values)
+	end
+
+	-- Add set bonus scale values if present.
+	if Item.SetBonusValues and type(Item.SetBonusValues) == "table" and table.getn(Item.SetBonusValues) > 0 then
+		PawnAddSetBonusValuesToTooltip(Tooltip, Item.SetBonusValues)
 	end
 	
 	-- Record that we've added lines
@@ -507,7 +520,7 @@ function PawnPatchTooltip(Tooltip)
 					end
 					if not Item.Values then
 						PawnFixStupidTooltipFormatting("GameTooltip")
-						Item.Stats, Item.SocketBonusStats, Item.UnknownLines = PawnGetStatsFromTooltip("GameTooltip", false)							-- If no recognizable stats were found, this is not an equipment tooltip (e.g. a spell or ability).
+						Item.Stats, Item.SocketBonusStats, Item.UnknownLines, _, Item.SetBonusStats = PawnGetStatsFromTooltip("GameTooltip", false)							-- If no recognizable stats were found, this is not an equipment tooltip (e.g. a spell or ability).
 							if not Item.Stats or not next(Item.Stats) then return end						PawnRecalculateItemValuesIfNecessary(Item)
 						PawnCacheItem(Item)
 					end
