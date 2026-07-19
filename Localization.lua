@@ -440,6 +440,13 @@ PawnRegexes =
 	-- Strings that are ignored for compatibility with other mods
 	-- ========================================
 	{"^Used by outfits:"}, -- Mod compatibility: Outfitter
+
+	-- ========================================
+	-- Turtle WoW specific lines to ignore
+	-- ========================================
+	{"^ItemID:"}, -- Turtle WoW item ID line added by SellValue/tooltip addons
+	{"^Sells for"}, -- Turtle WoW sell price line
+	{"^Value:"}, -- Turtle WoW value line
 	
 	-- ========================================
 	-- Common strings that are ignored (rare ones are at the bottom of the file)
@@ -616,6 +623,7 @@ PawnRegexes =
 	{"^%+?(%d+) Healing %+?(%d+) Spell Damage$", "Healing", 1, PawnMultipleStatsExtract, "SpellDamage", 2, PawnMultipleStatsExtract},
 	{"^%+?(%d+) Healing and %+?(%d+) Spell Damage$", "Healing", 1, PawnMultipleStatsExtract, "SpellDamage", 2, PawnMultipleStatsExtract},
 	{"^%+?(%d+) Healing Spells and %+?(%d+) Damage Spells$", "Healing", 1, PawnMultipleStatsExtract, "SpellDamage", 2, PawnMultipleStatsExtract},
+	{"^%+?(%d+) Healing Spells$", "Healing", 1, PawnMultipleStatsExtract}, -- Turtle WoW tooltip format
 	{"^Equip: Increases your spell penetration by (%d+)%.$", "SpellPenetration"}, -- Frostfire Robe
 	{"^%+?(%d+) Spell Penetration$", "SpellPenetration"}, -- Radiant Talasite
 	{"^%+(%d+) Fire Damage$", "FireSpellDamage"},
