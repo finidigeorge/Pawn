@@ -163,26 +163,23 @@ function PawnLinkWranglerOnTooltip(Tooltip, ItemLink)
 	PawnAttachIconToTooltip(Tooltip, false, ItemLink)
 end
 
--- Hooks additional tooltip-like frames discovered at runtime.
--- Useful for UI packs that use custom tooltip frames for quest content.
+-- Hooks known additional item tooltips discovered at runtime.
+-- Do not scan every global containing "Tooltip": many UI addons use shared tooltip-like
+-- frames for menus, and attaching Pawn's repair loop to those frames leaks stale item data.
 function PawnTryHookAdditionalTooltips()
-	if not getfenv then return end
-	local GlobalTable = getfenv(0)
-	if type(GlobalTable) ~= "table" then return end
-
-	for Name, Tooltip in pairs(GlobalTable) do
-		local TooltipType = type(Tooltip)
-		if type(Name) == "string" and string.find(Name, "Tooltip") and (TooltipType == "table" or TooltipType == "userdata") then
-			if Tooltip.GetScript and Tooltip.SetScript and Tooltip.GetName and Tooltip.NumLines and Tooltip.GetItem then
-				if not Tooltip.PawnHooked then
-					local OriginalOnUpdate = Tooltip:GetScript("OnUpdate")
-					Tooltip:SetScript("OnUpdate", function()
-						if OriginalOnUpdate then OriginalOnUpdate() end
-						PawnPatchTooltip(this)
-					end)
-					Tooltip.PawnHooked = true
-				end
-			end
+	local TooltipNames = {
+		"ItemRefTooltip2", "ItemRefTooltip3", "ItemRefTooltip4", "ItemRefTooltip5",
+		"AtlasLootTooltip"
+	}
+	for _, Name in pairs(TooltipNames) do
+		local Tooltip = getglobal(Name)
+		if Tooltip and Tooltip.GetScript and Tooltip.SetScript and Tooltip.GetName and Tooltip.NumLines and not Tooltip.PawnHooked then
+			local OriginalOnUpdate = Tooltip:GetScript("OnUpdate")
+			Tooltip:SetScript("OnUpdate", function()
+				if OriginalOnUpdate then OriginalOnUpdate() end
+				PawnPatchTooltip(this)
+			end)
+			Tooltip.PawnHooked = true
 		end
 	end
 end
@@ -273,7 +270,7 @@ function PawnBootstrap_SetDefaultKeybindings()
 	-- We hook the standard tooltips so that whenever they are shown/updated, they
 	-- gain the Pawn "OnUpdate" watcher that ensures our lines stay at the bottom.
 	local tooltipsToHook = {
-		GameTooltip, ItemRefTooltip, ShoppingTooltip1, ShoppingTooltip2,
+		ItemRefTooltip, ShoppingTooltip1, ShoppingTooltip2,
 		AtlasLootTooltip, ItemRefTooltip2,
 		ItemRefTooltip3, ItemRefTooltip4, ItemRefTooltip5
 	}
@@ -288,6 +285,24 @@ function PawnBootstrap_SetDefaultKeybindings()
 		end
 	end
 	PawnTryHookAdditionalTooltips()
+
+	-- GameTooltip is shared with non-item menus, so do not patrol it from OnUpdate.
+	-- OnShow runs after its visible contents are built; the visible-stat parser then
+	-- handles both base values and set bonuses without relying on a stale item link.
+	if GameTooltip and GameTooltip:GetScript("OnShow") ~= GameTooltip.PawnOnShowWrapper then
+		local OriginalOnShow = GameTooltip:GetScript("OnShow")
+		local OnShowWrapper = function()
+			if this.PawnOnShowUpdating then return end
+			if OriginalOnShow then OriginalOnShow() end
+			local OldNumLines = this:NumLines()
+			this.PawnOnShowUpdating = true
+			local Finalized = PawnFinalizeVisibleItemTooltip(this)
+			if Finalized and this:NumLines() ~= OldNumLines then this:Show() end
+			this.PawnOnShowUpdating = nil
+		end
+		GameTooltip:SetScript("OnShow", OnShowWrapper)
+		GameTooltip.PawnOnShowWrapper = OnShowWrapper
+	end
 
 	local StaticHooksInstalled = PawnInternal and PawnInternal.GetStaticTooltipHooksInstalled and PawnInternal.GetStaticTooltipHooksInstalled()
 	if not StaticHooksInstalled then
@@ -379,7 +394,6 @@ function PawnBootstrap_SetDefaultKeybindings()
 				local r, g, b = line1:GetTextColor()
 				-- AddHeader sets line 1 to gray (0.5,0.5,0.5). Skip the pre-AddHeader Show call.
 				if not r or r > 0.55 or g > 0.55 or b > 0.55 then return end
-				if PawnTooltipHasPawnScaleLine(Tooltip) then return end
 
 				local line2 = getglobal(tooltipName .. "TextLeft2")
 				local itemName = line2 and line2:GetText()
@@ -404,12 +418,12 @@ function PawnBootstrap_SetDefaultKeybindings()
 				local itemLink = Tooltip.PawnShaguLastLink
 				if not itemLink then return end
 
-				-- Inject Pawn lines. Guard against re-entry since PawnUpdateTooltip calls Show().
+				-- Finalize after Shagu has populated the complete comparison tooltip.
 				Tooltip.PawnShaguUpdating = true
-				if not Tooltip.PawnData then Tooltip.PawnData = {} end
-				Tooltip.PawnData.LastItemLink = itemLink
-				Tooltip.PawnData.PawnLinesAdded = nil
-				PawnUpdateTooltip(Tooltip, "SetHyperlink", itemLink)
+				PawnFinalizeItemTooltip(Tooltip, itemLink)
+				-- Re-render so the backdrop resizes to include the Pawn lines we just added.
+				-- Call cShow directly to avoid recursing through this Lua shadow.
+				cShow(self)
 				Tooltip.PawnShaguUpdating = nil
 			end
 
@@ -417,66 +431,6 @@ function PawnBootstrap_SetDefaultKeybindings()
 		end
 		PawnHookShaguTooltipShow(ShoppingTooltip1)
 		PawnHookShaguTooltipShow(ShoppingTooltip2)
-	end
-
-	local PaperDollHooked = PawnInternal and PawnInternal.GetPaperDollOnEnterHooked and PawnInternal.GetPaperDollOnEnterHooked()
-	if (not PaperDollHooked) and PaperDollItemSlotButton_OnEnter then
-		local original_PaperDollItemSlotButton_OnEnter = PaperDollItemSlotButton_OnEnter
-		PaperDollItemSlotButton_OnEnter = function()
-			original_PaperDollItemSlotButton_OnEnter()
-
-			local slotId = this:GetID()
-			if (not slotId or slotId == 0) and this:GetName() then
-				local slotName = string.gsub(this:GetName(), "Character", "")
-				slotName = string.gsub(slotName, "Slot", "")
-				slotId, _, _ = GetInventorySlotInfo(slotName .. "Slot")
-			end
-
-			if slotId and slotId > 0 then
-				local ItemLink = GetInventoryItemLink("player", slotId)
-				if ItemLink then
-					PawnUpdateTooltip(GameTooltip, "SetHyperlink", ItemLink)
-				else
-					PawnUpdateTooltip(GameTooltip, "SetInventoryItem", "player", slotId)
-				end
-
-				if GameTooltip.PawnData then
-					GameTooltip.PawnData.LastMethod = "SetHyperlink"
-					GameTooltip.PawnData.LastP1 = ItemLink
-					GameTooltip.PawnData.LastP2 = nil
-					GameTooltip.PawnData.PawnLinesAdded = nil
-					GameTooltip.PawnData.LastNumLines = GameTooltip:NumLines()
-				end
-				GameTooltip:Show()
-			end
-		end
-		if PawnInternal and PawnInternal.SetPaperDollOnEnterHooked then PawnInternal.SetPaperDollOnEnterHooked(true) end
-	end
-
-	local ContainerHooked = PawnInternal and PawnInternal.GetContainerOnEnterHooked and PawnInternal.GetContainerOnEnterHooked()
-	if (not ContainerHooked) and ContainerFrameItemButton_OnEnter then
-		local original_ContainerFrameItemButton_OnEnter = ContainerFrameItemButton_OnEnter
-		ContainerFrameItemButton_OnEnter = function()
-			original_ContainerFrameItemButton_OnEnter()
-
-			if this and this:GetParent() then
-				local container = this:GetParent():GetID()
-				local slot = this:GetID()
-				if container and slot then
-					PawnUpdateTooltip(GameTooltip, "SetBagItem", container, slot)
-
-					if GameTooltip.PawnData then
-						GameTooltip.PawnData.LastMethod = "SetBagItem"
-						GameTooltip.PawnData.LastP1 = container
-						GameTooltip.PawnData.LastP2 = slot
-						GameTooltip.PawnData.PawnLinesAdded = nil
-						GameTooltip.PawnData.LastNumLines = GameTooltip:NumLines()
-					end
-					GameTooltip:Show()
-				end
-			end
-		end
-		if PawnInternal and PawnInternal.SetContainerOnEnterHooked then PawnInternal.SetContainerOnEnterHooked(true) end
 	end
 
 	PawnTryHookAdditionalTooltips()

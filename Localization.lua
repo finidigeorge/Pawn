@@ -61,6 +61,7 @@ PawnStats =
 	{"Frost spell power", "FrostSpellDamage", "Frost-only spell power.  This stat does not appear on items that give spell power to all schools."},
 	{"Holy damage", "HolySpellDamage", "Holy-only spell damage.  This stat is quite rare, and does not appear on items that give spell power to all schools."},
 	{"Spell penetration", "SpellPenetration", "Spell penetration causes your spells to ignore some of your opponent's resistances."},
+	{"Attack/cast speed", "Haste", "Percentage increase to attack speed and casting speed (Turtle WoW set bonuses)."},
 	
 	{"Defense stats"},
 	{"Armor", "Armor", "Armor."},
@@ -418,6 +419,8 @@ PawnIgnoreNames =
 PawnNormalizationRegexes =
 {
 	{"^Set: ", "Equip: "}, -- Normalize "Set: " to "Equip: " so set bonus lines match existing Equip: regexes
+	{"^set: ", "Equip: "},
+	{"^Equip: (%+%d+.-)%.?$", "%1"}, -- Strip "Equip: " from direct +N stat set bonus lines (e.g. "Equip: +8 All Resistances." -> "+8 All Resistances")
 	{"^([%w%s%.]+) %+(%d+)$", "+%2 %1"}, -- "Stamina +5" --> "+5 Stamina"
 	{"^(.-)|r.*", "%1"}, -- For removing meta gem requirements
 }
@@ -448,7 +451,6 @@ PawnRegexes =
 	{"^Sells for"}, -- Turtle WoW sell price line
 	{"^Value:"}, -- Turtle WoW value line
 	{"^%(%d+%) Set:"}, -- Inactive set bonus e.g. "(4) Set: +10 Intellect."
-	{"^Equip: Increases your attack and casting speed by"}, -- % speed bonus, not a numeric stat Pawn tracks (Set: normalized to Equip:)
 	
 	-- ========================================
 	-- Common strings that are ignored (rare ones are at the bottom of the file)
@@ -537,6 +539,7 @@ PawnRegexes =
 	{"^%+?(%-?%d+) Spirit$", "Spirit"},
 	{"^Boar's Speed$", "Stamina", 9, PawnMultipleStatsFixed}, -- Enchantment; has additional effects
 	{"^Cat's Swiftness$", "Agility", 6, PawnMultipleStatsFixed}, -- Enchantment; has additional effects
+	{"^Equip: Increases your attack and casting speed by (%d+)%%%.?$", "Haste"}, -- Turtle WoW set bonus (Set: normalized to Equip:)
 	{"^Equip: Improves your chance to hit by (%d+)%%%.?$", "Hit"},
 	{"^Equip: Increases your chance to hit by (%d+)%%%.?$", "Hit"},
 	{"^Equip: ([%d%.,]+)%% of damage dealt is returned as healing%.?$", "Vampirism"},

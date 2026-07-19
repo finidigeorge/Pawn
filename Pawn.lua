@@ -202,29 +202,13 @@ function PawnInitialize()
 		PawnLastHoveredItem = nil
 		if GameTooltip.PawnData then
 			GameTooltip.PawnData.IsQuestTooltip = nil
+			GameTooltip.PawnData.LastItemLink = nil
+			GameTooltip.PawnData.PawnLinesAdded = nil
+			GameTooltip.PawnData.LastNumLines = nil
 			GameTooltip.PawnData.LastQuestRepairLines = nil
 			GameTooltip.PawnData.LastQuestRepairLink = nil
 		end
 	end)
-	hooksecurefunc(GameTooltip, "Show", function()
-		if GameTooltip.PawnShowHookRunning or GameTooltip.UpdatingPawn then return end
-		if PawnIsQuestLikeGameTooltip(GameTooltip) then
-			GameTooltip.PawnShowHookRunning = true
-			PawnPatchTooltip(GameTooltip)
-			GameTooltip.PawnShowHookRunning = nil
-			return
-		end
-		if not GameTooltip.GetItem then return end
-		local _, ItemLink = GameTooltip:GetItem()
-		if not ItemLink or PawnGetHyperlinkType(ItemLink) ~= "item" then return end
-		if GameTooltip.PawnData and GameTooltip.PawnData.LastItemLink == ItemLink then
-			if GameTooltip.PawnData.PawnLinesAdded or PawnTooltipHasPawnScaleLine(GameTooltip) then return end
-		end
-		GameTooltip.PawnShowHookRunning = true
-		PawnUpdateTooltip(GameTooltip, "SetHyperlink", ItemLink)
-		GameTooltip.PawnShowHookRunning = nil
-	end)
-
 	-- NOTE: Do not hook OnTooltipSetItem here.
 	-- In 1.12 this script handler may not exist on GameTooltip and can hard-error.
 	
@@ -654,17 +638,29 @@ function PawnAddSetBonusValuesToTooltip(Tooltip, SetBonusValues)
 		if Value and Value > 0 then
 			local Scale = PawnOptions.Scales[ScaleName]
 			if Scale and not Scale.Hidden then
-				local TextColor = VgerCore.Color.Blue
-				if Scale.Color and string.len(Scale.Color) == 6 then TextColor = "|cff" .. Scale.Color end
 				local DisplayName = "Set: " .. ScaleName
-				local TooltipText = string.format(PawnUnenchantedAnnotationFormat, TextColor, DisplayName, Value)
-				if PawnOptions.AlignNumbersRight then
-					local Pos = string.find(TooltipText, ":")
-					local Left = string.sub(TooltipText, 0, Pos - 1)
-					local Right = string.sub(TooltipText, 0, 10) .. string.sub(TooltipText, Pos + 3)
-					Tooltip:AddDoubleLine(Left, Right)
-				else
-					Tooltip:AddLine(TooltipText)
+				local AlreadyPresent = false
+				local TooltipName = Tooltip.GetName and Tooltip:GetName()
+				if TooltipName and Tooltip.NumLines then
+					for i = 1, Tooltip:NumLines() do
+						local ExistingLine = getglobal(TooltipName .. "TextLeft" .. i)
+						local ExistingText = ExistingLine and ExistingLine:GetText()
+						if ExistingText and string.find(ExistingText, DisplayName, 1, true) then
+							AlreadyPresent = true
+							break
+						end
+					end
+				end
+				if not AlreadyPresent then
+					local TextColor = VgerCore.Color.Blue
+					if Scale.Color and string.len(Scale.Color) == 6 then TextColor = "|cff" .. Scale.Color end
+					if PawnOptions.AlignNumbersRight then
+						local ValueText = string.format("%." .. PawnOptions.Digits .. "f", Value)
+						Tooltip:AddDoubleLine(TextColor .. DisplayName, TextColor .. ValueText)
+					else
+						local TooltipText = string.format(PawnUnenchantedAnnotationFormat, TextColor, DisplayName, Value)
+						Tooltip:AddLine(TooltipText)
+					end
 				end
 			end
 		end
