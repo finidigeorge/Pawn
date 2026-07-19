@@ -168,8 +168,7 @@ end
 -- frames for menus, and attaching Pawn's repair loop to those frames leaks stale item data.
 function PawnTryHookAdditionalTooltips()
 	local TooltipNames = {
-		"ItemRefTooltip2", "ItemRefTooltip3", "ItemRefTooltip4", "ItemRefTooltip5",
-		"AtlasLootTooltip"
+		"ItemRefTooltip2", "ItemRefTooltip3", "ItemRefTooltip4", "ItemRefTooltip5"
 	}
 	for _, Name in pairs(TooltipNames) do
 		local Tooltip = getglobal(Name)
@@ -271,7 +270,7 @@ function PawnBootstrap_SetDefaultKeybindings()
 	-- gain the Pawn "OnUpdate" watcher that ensures our lines stay at the bottom.
 	local tooltipsToHook = {
 		ItemRefTooltip, ShoppingTooltip1, ShoppingTooltip2,
-		AtlasLootTooltip, ItemRefTooltip2,
+		ItemRefTooltip2,
 		ItemRefTooltip3, ItemRefTooltip4, ItemRefTooltip5
 	}
 	for _, tooltip in pairs(tooltipsToHook) do
@@ -286,11 +285,11 @@ function PawnBootstrap_SetDefaultKeybindings()
 	end
 	PawnTryHookAdditionalTooltips()
 
-	-- GameTooltip is shared with non-item menus, so do not patrol it from OnUpdate.
-	-- OnShow runs after its visible contents are built; the visible-stat parser then
-	-- handles both base values and set bonuses without relying on a stale item link.
-	if GameTooltip and GameTooltip:GetScript("OnShow") ~= GameTooltip.PawnOnShowWrapper then
-		local OriginalOnShow = GameTooltip:GetScript("OnShow")
+	-- GameTooltip uses OnShow because shadowing its C Show method breaks some 1.12 clients.
+	local function HookVisibleItemTooltipOnShow(Tooltip)
+		if not Tooltip or not Tooltip.GetScript or not Tooltip.SetScript then return end
+		if Tooltip:GetScript("OnShow") == Tooltip.PawnOnShowWrapper then return end
+		local OriginalOnShow = Tooltip:GetScript("OnShow")
 		local OnShowWrapper = function()
 			if this.PawnOnShowUpdating then return end
 			if OriginalOnShow then OriginalOnShow() end
@@ -300,9 +299,31 @@ function PawnBootstrap_SetDefaultKeybindings()
 			if Finalized and this:NumLines() ~= OldNumLines then this:Show() end
 			this.PawnOnShowUpdating = nil
 		end
-		GameTooltip:SetScript("OnShow", OnShowWrapper)
-		GameTooltip.PawnOnShowWrapper = OnShowWrapper
+		Tooltip:SetScript("OnShow", OnShowWrapper)
+		Tooltip.PawnOnShowWrapper = OnShowWrapper
 	end
+	HookVisibleItemTooltipOnShow(GameTooltip)
+
+	-- AtlasLoot and Atlas-CFM repeatedly call Show() while their private tooltips are
+	-- already visible, so OnShow is not reliable. Their Lua Show calls can safely use
+	-- the same direct wrapper strategy that works for Shagu comparison frames.
+	local function HookVisibleItemTooltipShow(Tooltip)
+		if not Tooltip or Tooltip.PawnVisibleShowHooked then return end
+		local OriginalShow = Tooltip.Show
+		Tooltip.Show = function(self)
+			OriginalShow(self)
+			if self.PawnVisibleShowUpdating then return end
+			self.PawnVisibleShowUpdating = true
+			local OldNumLines = self:NumLines()
+			local Finalized = PawnFinalizeVisibleItemTooltip(self)
+			if Finalized and self:NumLines() ~= OldNumLines then OriginalShow(self) end
+			self.PawnVisibleShowUpdating = nil
+		end
+		Tooltip.PawnVisibleShowHooked = true
+	end
+	HookVisibleItemTooltipShow(getglobal("AtlasLootTooltip"))
+	HookVisibleItemTooltipShow(getglobal("AtlasLootTooltip2"))
+	HookVisibleItemTooltipShow(getglobal("AtlasCFMLootTooltip"))
 
 	local StaticHooksInstalled = PawnInternal and PawnInternal.GetStaticTooltipHooksInstalled and PawnInternal.GetStaticTooltipHooksInstalled()
 	if not StaticHooksInstalled then

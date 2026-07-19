@@ -212,39 +212,6 @@ function PawnInitialize()
 	-- NOTE: Do not hook OnTooltipSetItem here.
 	-- In 1.12 this script handler may not exist on GameTooltip and can hard-error.
 	
-	-- AtlasLoot Turtle WoW compatibility
-	if AtlasLootTooltip then
-		VgerCore.HookInsecureFunction(AtlasLootTooltip, "SetHyperlink", function(self, ItemLink) PawnUpdateTooltip(AtlasLootTooltip, "SetHyperlink", ItemLink) end)
-		if AtlasLootTooltip.SetItemByID then
-			VgerCore.HookInsecureFunction(AtlasLootTooltip, "SetItemByID", function(self, ItemID) PawnUpdateTooltip(AtlasLootTooltip, "SetItemByID", nil) end)
-		end
-		if AtlasLootTooltip.SetLootItem then
-			VgerCore.HookInsecureFunction(AtlasLootTooltip, "SetLootItem", function(self, p1, p2) PawnUpdateTooltip(AtlasLootTooltip, "SetLootItem", p1, p2) end)
-		end
-		if not AtlasLootTooltip.PawnOnUpdateHooked then
-			local AtlasLootOriginalOnUpdate = AtlasLootTooltip:GetScript("OnUpdate")
-			
-			-- Hook OnUpdate to detect if AtlasLoot / Atlas-TW has modified the tooltip after it was shown.
-			-- This replaces the clumsy "separate tooltip" approach by effectively re-injecting Pawn lines
-			-- ONLY if the tooltip content was changed by AtlasLoot.
-			AtlasLootTooltip:SetScript("OnUpdate", function()
-				-- First call the original OnUpdate if any
-				if AtlasLootOriginalOnUpdate then AtlasLootOriginalOnUpdate() end
-				local Tooltip = this
-				
-				-- Only check if we have data for this tooltip
-				if Tooltip and Tooltip.PawnData and Tooltip.PawnData.LastItemLink then
-					-- If the line count has changed, it means AtlasLoot added its Source/ItemID lines.
-					-- We wait for Atlas-TW to finish its work, then re-update OUR lines.
-					if Tooltip:NumLines() ~= Tooltip.PawnData.LastNumLines then
-						PawnUpdateTooltip(Tooltip, "SetHyperlink", Tooltip.PawnData.LastItemLink)
-					end
-				end
-			end)
-			AtlasLootTooltip.PawnOnUpdateHooked = true
-		end
-	end
-	
 	-- LinkWrangler compatibility
 	if LinkWrangler then
 		LinkWrangler.RegisterCallback("Pawn", PawnLinkWranglerOnTooltip, "refresh")
