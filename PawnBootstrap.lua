@@ -1,84 +1,26 @@
 -- Pawn bootstrap and hook helpers (extracted from Pawn.lua)
 
--- Hooks EquipCompare tooltips if available.  Safe to call multiple times.
-function PawnHookEquipCompareTooltips()
-	if ComparisonTooltip1 and not ComparisonTooltip1.PawnEquipCompareHooked then
-		if ComparisonTooltip1.SetHyperlinkCompareItem then VgerCore.HookInsecureFunction(ComparisonTooltip1, "SetHyperlinkCompareItem", function(self, ItemLink) PawnUpdateTooltip(ComparisonTooltip1, "SetHyperlinkCompareItem", ItemLink) end) end
-		if ComparisonTooltip1.SetInventoryItem then VgerCore.HookInsecureFunction(ComparisonTooltip1, "SetInventoryItem", function(self, p1, p2, p3) PawnUpdateTooltip(ComparisonTooltip1, "SetInventoryItem", p1, p2, p3) end) end -- EquipCompare with CharactersViewer
-		if ComparisonTooltip1.SetHyperlink then VgerCore.HookInsecureFunction(ComparisonTooltip1, "SetHyperlink", function(self, ItemLink) PawnUpdateTooltip(ComparisonTooltip1, "SetHyperlink", ItemLink) end) end -- EquipCompare with Armory
-		ComparisonTooltip1.PawnEquipCompareHooked = true
+-- Hooks a private item tooltip at its completed Show lifecycle. Safe to call repeatedly.
+-- This is for addon-owned frames only; shadowing GameTooltip.Show breaks some 1.12 clients.
+function PawnHookVisibleItemTooltipShow(Tooltip)
+	if not Tooltip or Tooltip.PawnVisibleShowHooked then return end
+	local OriginalShow = Tooltip.Show
+	Tooltip.Show = function(self)
+		OriginalShow(self)
+		if self.PawnVisibleShowUpdating then return end
+		self.PawnVisibleShowUpdating = true
+		local OldNumLines = self:NumLines()
+		local Finalized = PawnFinalizeVisibleItemTooltip(self)
+		if Finalized and self:NumLines() ~= OldNumLines then OriginalShow(self) end
+		self.PawnVisibleShowUpdating = nil
 	end
-	if ComparisonTooltip1 and not ComparisonTooltip1.PawnEquipCompareShowHooked then
-		hooksecurefunc(ComparisonTooltip1, "Show", function()
-			if ComparisonTooltip1.GetItem then
-				local _, ItemLink = ComparisonTooltip1:GetItem()
-				if ItemLink then PawnUpdateTooltip(ComparisonTooltip1, "SetHyperlink", ItemLink) end
-			end
-			PawnScheduleEquipCompareRefresh(ComparisonTooltip1, 0.25)
-		end)
-		ComparisonTooltip1.PawnEquipCompareShowHooked = true
-	end
-	if ComparisonTooltip1 and not ComparisonTooltip1.PawnEquipCompareHideHooked then
-		hooksecurefunc(ComparisonTooltip1, "Hide", function()
-			if ComparisonTooltip1.PawnData then
-				ComparisonTooltip1.PawnData.PawnLinesAdded = nil
-				ComparisonTooltip1.PawnData.LastItemLink = nil
-			end
-		end)
-		ComparisonTooltip1.PawnEquipCompareHideHooked = true
-	end
-
-	if ComparisonTooltip2 and not ComparisonTooltip2.PawnEquipCompareHooked then
-		if ComparisonTooltip2.SetHyperlinkCompareItem then VgerCore.HookInsecureFunction(ComparisonTooltip2, "SetHyperlinkCompareItem", function(self, ItemLink) PawnUpdateTooltip(ComparisonTooltip2, "SetHyperlinkCompareItem", ItemLink) end) end
-		if ComparisonTooltip2.SetInventoryItem then VgerCore.HookInsecureFunction(ComparisonTooltip2, "SetInventoryItem", function(self, p1, p2, p3) PawnUpdateTooltip(ComparisonTooltip2, "SetInventoryItem", p1, p2, p3) end) end -- EquipCompare with CharactersViewer
-		if ComparisonTooltip2.SetHyperlink then VgerCore.HookInsecureFunction(ComparisonTooltip2, "SetHyperlink", function(self, ItemLink) PawnUpdateTooltip(ComparisonTooltip2, "SetHyperlink", ItemLink) end) end -- EquipCompare with Armory
-		ComparisonTooltip2.PawnEquipCompareHooked = true
-	end
-	if ComparisonTooltip2 and not ComparisonTooltip2.PawnEquipCompareShowHooked then
-		hooksecurefunc(ComparisonTooltip2, "Show", function()
-			if ComparisonTooltip2.GetItem then
-				local _, ItemLink = ComparisonTooltip2:GetItem()
-				if ItemLink then PawnUpdateTooltip(ComparisonTooltip2, "SetHyperlink", ItemLink) end
-			end
-			PawnScheduleEquipCompareRefresh(ComparisonTooltip2, 0.25)
-		end)
-		ComparisonTooltip2.PawnEquipCompareShowHooked = true
-	end
-	if ComparisonTooltip2 and not ComparisonTooltip2.PawnEquipCompareHideHooked then
-		hooksecurefunc(ComparisonTooltip2, "Hide", function()
-			if ComparisonTooltip2.PawnData then
-				ComparisonTooltip2.PawnData.PawnLinesAdded = nil
-				ComparisonTooltip2.PawnData.LastItemLink = nil
-			end
-		end)
-		ComparisonTooltip2.PawnEquipCompareHideHooked = true
-	end
+	Tooltip.PawnVisibleShowHooked = true
 end
 
--- Schedules a one-shot delayed refresh for EquipCompare tooltips.
--- Useful when another addon redraws the tooltip shortly after Show().
-function PawnScheduleEquipCompareRefresh(Tooltip, Delay)
-	if not Tooltip or Tooltip.PawnEquipCompareRefreshScheduled then return end
-	Tooltip.PawnEquipCompareRefreshScheduled = true
-
-	local OriginalOnUpdate = Tooltip:GetScript("OnUpdate")
-	local Elapsed = 0
-	Tooltip:SetScript("OnUpdate", function()
-		if OriginalOnUpdate then OriginalOnUpdate() end
-		Elapsed = Elapsed + (arg1 or 0)
-		if Elapsed < (Delay or 0.25) then return end
-
-		Tooltip:SetScript("OnUpdate", OriginalOnUpdate)
-		Tooltip.PawnEquipCompareRefreshScheduled = nil
-
-		if Tooltip:IsShown() and Tooltip.GetItem then
-			local _, ItemLink = Tooltip:GetItem()
-			if ItemLink then
-				if Tooltip.PawnData then Tooltip.PawnData.PawnLinesAdded = nil end
-				PawnUpdateTooltip(Tooltip, "SetHyperlink", ItemLink)
-			end
-		end
-	end)
+-- Hooks EquipCompare tooltips if available. Safe to call multiple times and after late loads.
+function PawnHookEquipCompareTooltips()
+	PawnHookVisibleItemTooltipShow(getglobal("ComparisonTooltip1"))
+	PawnHookVisibleItemTooltipShow(getglobal("ComparisonTooltip2"))
 end
 
 -- Sets a keybinding to its default value if it's not already assigned to something else.  Returns true if anything was changed.
@@ -167,20 +109,8 @@ end
 -- Do not scan every global containing "Tooltip": many UI addons use shared tooltip-like
 -- frames for menus, and attaching Pawn's repair loop to those frames leaks stale item data.
 function PawnTryHookAdditionalTooltips()
-	local TooltipNames = {
-		"ItemRefTooltip2", "ItemRefTooltip3", "ItemRefTooltip4", "ItemRefTooltip5"
-	}
-	for _, Name in pairs(TooltipNames) do
-		local Tooltip = getglobal(Name)
-		if Tooltip and Tooltip.GetScript and Tooltip.SetScript and Tooltip.GetName and Tooltip.NumLines and not Tooltip.PawnHooked then
-			local OriginalOnUpdate = Tooltip:GetScript("OnUpdate")
-			Tooltip:SetScript("OnUpdate", function()
-				if OriginalOnUpdate then OriginalOnUpdate() end
-				PawnPatchTooltip(this)
-			end)
-			Tooltip.PawnHooked = true
-		end
-	end
+	-- Known late-created item tooltips are hooked explicitly by their Show lifecycle in
+	-- PawnBootstrap_SetDefaultKeybindings. Broad runtime discovery caused menu pollution.
 end
 
 -- If debugging is enabled, show a message; otherwise, do nothing.
@@ -269,9 +199,7 @@ function PawnBootstrap_SetDefaultKeybindings()
 	-- We hook the standard tooltips so that whenever they are shown/updated, they
 	-- gain the Pawn "OnUpdate" watcher that ensures our lines stay at the bottom.
 	local tooltipsToHook = {
-		ItemRefTooltip, ShoppingTooltip1, ShoppingTooltip2,
-		ItemRefTooltip2,
-		ItemRefTooltip3, ItemRefTooltip4, ItemRefTooltip5
+		ShoppingTooltip1, ShoppingTooltip2
 	}
 	for _, tooltip in pairs(tooltipsToHook) do
 		if tooltip and not tooltip.PawnHooked then
@@ -304,26 +232,15 @@ function PawnBootstrap_SetDefaultKeybindings()
 	end
 	HookVisibleItemTooltipOnShow(GameTooltip)
 
-	-- AtlasLoot and Atlas-CFM repeatedly call Show() while their private tooltips are
-	-- already visible, so OnShow is not reliable. Their Lua Show calls can safely use
-	-- the same direct wrapper strategy that works for Shagu comparison frames.
-	local function HookVisibleItemTooltipShow(Tooltip)
-		if not Tooltip or Tooltip.PawnVisibleShowHooked then return end
-		local OriginalShow = Tooltip.Show
-		Tooltip.Show = function(self)
-			OriginalShow(self)
-			if self.PawnVisibleShowUpdating then return end
-			self.PawnVisibleShowUpdating = true
-			local OldNumLines = self:NumLines()
-			local Finalized = PawnFinalizeVisibleItemTooltip(self)
-			if Finalized and self:NumLines() ~= OldNumLines then OriginalShow(self) end
-			self.PawnVisibleShowUpdating = nil
-		end
-		Tooltip.PawnVisibleShowHooked = true
-	end
-	HookVisibleItemTooltipShow(getglobal("AtlasLootTooltip"))
-	HookVisibleItemTooltipShow(getglobal("AtlasLootTooltip2"))
-	HookVisibleItemTooltipShow(getglobal("AtlasCFMLootTooltip"))
+	-- Atlas and chat-link frames can remain visible while their contents change.
+	PawnHookVisibleItemTooltipShow(getglobal("AtlasLootTooltip"))
+	PawnHookVisibleItemTooltipShow(getglobal("AtlasLootTooltip2"))
+	PawnHookVisibleItemTooltipShow(getglobal("AtlasCFMLootTooltip"))
+	PawnHookVisibleItemTooltipShow(ItemRefTooltip)
+	PawnHookVisibleItemTooltipShow(getglobal("ItemRefTooltip2"))
+	PawnHookVisibleItemTooltipShow(getglobal("ItemRefTooltip3"))
+	PawnHookVisibleItemTooltipShow(getglobal("ItemRefTooltip4"))
+	PawnHookVisibleItemTooltipShow(getglobal("ItemRefTooltip5"))
 
 	local StaticHooksInstalled = PawnInternal and PawnInternal.GetStaticTooltipHooksInstalled and PawnInternal.GetStaticTooltipHooksInstalled()
 	if not StaticHooksInstalled then
@@ -339,7 +256,8 @@ function PawnBootstrap_SetDefaultKeybindings()
 		local ItemRefOriginalOnMouseUp = ItemRefTooltip:GetScript("OnMouseUp")
 		ItemRefTooltip:SetScript("OnEnter", function()
 			if ItemRefOriginalOnEnter then ItemRefOriginalOnEnter() end
-			_, PawnLastHoveredItem = ItemRefTooltip.GetItem and ItemRefTooltip:GetItem() or nil
+			PawnLastHoveredItem = nil
+			if ItemRefTooltip.GetItem then _, PawnLastHoveredItem = ItemRefTooltip:GetItem() end
 		end)
 		ItemRefTooltip:SetScript("OnLeave", function()
 			if ItemRefOriginalOnLeave then ItemRefOriginalOnLeave() end
@@ -349,7 +267,8 @@ function PawnBootstrap_SetDefaultKeybindings()
 			function()
 				if ItemRefOriginalOnMouseUp then ItemRefOriginalOnMouseUp() end
 				if arg1 == "RightButton" then
-					local _, ItemLink = ItemRefTooltip.GetItem and ItemRefTooltip:GetItem() or nil
+					local ItemLink = nil
+					if ItemRefTooltip.GetItem then _, ItemLink = ItemRefTooltip:GetItem() end
 					PawnUI_SetCompareItemAndShow(2, ItemLink)
 				end
 			end)

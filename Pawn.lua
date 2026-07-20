@@ -205,8 +205,6 @@ function PawnInitialize()
 			GameTooltip.PawnData.LastItemLink = nil
 			GameTooltip.PawnData.PawnLinesAdded = nil
 			GameTooltip.PawnData.LastNumLines = nil
-			GameTooltip.PawnData.LastQuestRepairLines = nil
-			GameTooltip.PawnData.LastQuestRepairLink = nil
 		end
 	end)
 	-- NOTE: Do not hook OnTooltipSetItem here.

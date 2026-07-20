@@ -173,11 +173,15 @@ SpellCrit=10.0, Spirit=0.1, Stamina=0.2, Haste=2.0 )</p>
 
 <h3>Enhancement (Melee DPS)</h3>
 <p>Uses a two-handed weapon in vanilla (no dual wield until TBC).
-Windfury Weapon procs make Attack Power and crit extremely powerful.</p>
+Windfury Weapon procs make Attack Power and crit extremely powerful.
+Stormstrike scales with weapon damage per swing (not DPS), so slower weapons
+hit harder per strike at the same DPS. TwoHandSpeed rewards slower weapons;
+SpeedBaseline=2.9 means weapons faster than 2.9s are penalised.</p>
 <p class="codeblock"><b><a href="#ScaleTags">Pawn scale tag:</a></b><br />
 <br />
 ( Pawn: v1: "Shaman Enhancement": Hit=20.0, Ap=1.0, Strength=2.0, Agility=1.5,
-Crit=15.0, Stamina=0.2, TwoHandDps=6.0, SpellDamage=1.5, NatureSpellDamage=1.5, Haste=2.5 )</p>
+Crit=15.0, Stamina=0.2, TwoHandDps=6.0, TwoHandSpeed=10, SpeedBaseline=2.9,
+SpellDamage=1.5, NatureSpellDamage=1.5, Haste=2.5 )</p>
 
 <h3>Elemental DPS</h3>
 <p>Spell Hit is the top priority. Nature Spell Damage stacks with generic Spell

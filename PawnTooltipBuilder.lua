@@ -464,11 +464,6 @@ function PawnUpdateTooltip(Tooltip, MethodName, Param1, Param2, Param3, Param4)
 	if not Tooltip then return end
 	if not Tooltip.PawnData then Tooltip.PawnData = {} end
 	Tooltip.PawnData.LastItemLink = Item.Link
-	Tooltip.PawnData.LastMethod = MethodName
-	Tooltip.PawnData.LastP1 = Param1
-	Tooltip.PawnData.LastP2 = Param2
-	Tooltip.PawnData.LastP3 = Param3
-	Tooltip.PawnData.LastP4 = Param4
 	if MethodName == "SetQuestItem" or MethodName == "SetQuestLogItem" then
 		Tooltip.PawnData.IsQuestTooltip = true
 	elseif Tooltip == GameTooltip then
@@ -494,15 +489,6 @@ function PawnUpdateTooltip(Tooltip, MethodName, Param1, Param2, Param3, Param4)
 	-- Our hooksecurefunc runs between Set* and Show, so lines are already in the buffer
 	-- when the game's Show() fires and commits them.
 
-	-- Install OnUpdate repair hook if not already present.
-	if Tooltip ~= GameTooltip and not Tooltip.PawnHooked and TooltipName ~= "ComparisonTooltip1" and TooltipName ~= "ComparisonTooltip2" then
-		local OriginalOnUpdate = Tooltip:GetScript("OnUpdate")
-		Tooltip:SetScript("OnUpdate", function()
-			if OriginalOnUpdate then OriginalOnUpdate() end
-			PawnPatchTooltip(this)
-		end)
-		Tooltip.PawnHooked = true
-	end
 end
 
 -- Repair path. Called from the Show hook and OnUpdate.
@@ -538,31 +524,6 @@ function PawnPatchTooltip(Tooltip)
 				if LiveLink ~= Tooltip.PawnData.LastItemLink then
 					Tooltip.PawnData.LastItemLink = LiveLink
 					Tooltip.PawnData.PawnLinesAdded = nil
-				end
-			end
-		end
-
-		-- Turtle WoW's character-sheet GameTooltip can return no item from GetItem()
-		-- even though SetInventoryItem populated it correctly. Resolve only from an
-		-- actual Character*Slot owner; this remains safe for shared menu tooltips.
-		if not ItemLink and Tooltip == GameTooltip and Tooltip.GetOwner then
-			local Owner = Tooltip:GetOwner()
-			local OwnerName = Owner and Owner.GetName and Owner:GetName()
-			if OwnerName and string.find(OwnerName, "^Character.*Slot$") and Owner.GetID then
-				local SlotID = Owner:GetID()
-				local InventoryLink = SlotID and GetInventoryItemLink("player", SlotID)
-				if InventoryLink and PawnGetHyperlinkType(InventoryLink) == "item" then
-					local ExpectedName = nil
-					if GetItemInfo then ExpectedName = GetItemInfo(InventoryLink) end
-					if not ExpectedName then
-						local _, _, LinkName = string.find(InventoryLink, "%[(.-)%]")
-						ExpectedName = LinkName
-					end
-					local VisibleName = PawnGetItemNameFromTooltip("GameTooltip")
-					if ExpectedName and VisibleName and ExpectedName == VisibleName then
-						ItemLink = InventoryLink
-						Tooltip.PawnData.LastItemLink = InventoryLink
-					end
 				end
 			end
 		end
