@@ -1,4 +1,4 @@
-# Pawn for Turtle WoW (Vanilla 1.12)
+# Pawn for Turtle/Octo/Capy ? WoW (Vanilla 1.12)
 
 A port of the popular item valuation addon **Pawn** (originally for TBC 2.4.3) 
 
