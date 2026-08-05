@@ -67,6 +67,7 @@ function PawnGetDefaultScale()
 			["Rap"] = 0.4,
 			["Mp5"] = 2.5,
 			["Hp5"] = 2.5,
+			["CastingRegen"] = 0.2,
 			["Mana"] = 1/15,
 			["Health"] = 1/15,
 			["BlockValue"] = 0.65,

@@ -62,6 +62,7 @@ PawnStats =
 	{"Holy damage", "HolySpellDamage", "Holy-only spell damage.  This stat is quite rare, and does not appear on items that give spell power to all schools."},
 	{"Spell penetration", "SpellPenetration", "Spell penetration causes your spells to ignore some of your opponent's resistances."},
 	{"Attack/cast speed", "Haste", "Percentage increase to attack speed and casting speed (Turtle WoW set bonuses)."},
+	{"Casting mana regen", "CastingRegen", "Percent of your mana regeneration that continues while casting.  Appears as \"Allows X% of your Mana regeneration to continue while casting\" on Turtle WoW items."},
 	
 	{"Defense stats"},
 	{"Armor", "Armor", "Armor."},
@@ -587,7 +588,10 @@ PawnRegexes =
 	{"^%+?(%d+) Ranged Attack Power$", "Rap"},
 	{"^Equip: Increases ranged attack power by (%d+)%.$", "Rap"},
 	{"^Savagery$", "Ap", 70, PawnMultipleStatsFixed}, -- weapon enchantment
+	{"^Equip: Allows (%d+)%% of your Mana regeneration to continue while casting%.$", "CastingRegen"}, -- Turtle WoW: Sacred Windhorn Robe etc.
 	{"^Equip: Restores (%d+) mana per 5 sec%.$", "Mp5"},
+	{"^Equip: Restores (%d+) mana per 5 seconds%.$", "Mp5"}, -- Turtle WoW: full "seconds" wording
+	{"^Equip: Restores (%d+) mana every 5 seconds%.$", "Mp5"}, -- Turtle WoW: full "seconds" wording
 	{"^Equip: Your Lightning Shield spell also grants you (%d+) mana per 5 sec%..*$", "Mp5"}, -- Earthshatterer (8) Set
 	{"^%+?(%d+) Mana Regen$", "Mp5"}, -- Shoulder enchantment, Scryers?
 	{"^Mana Regen (%d+) per 5 sec%.$", "Mp5"},
@@ -598,7 +602,9 @@ PawnRegexes =
 	{"^%+?(%d+) [mM]ana every 5 seconds$", "Mp5"},
 	{"^%+(%d+) Mana restored per 5 seconds$", "Mp5"}, -- Magister's armor kit
 	{"^Equip: Restores (%d+) health every 5 sec%.$", "Hp5"},
+	{"^Equip: Restores (%d+) health every 5 seconds%.$", "Hp5"}, -- Turtle WoW: full "seconds" wording
 	{"^Equip: Restores (%d+) health per 5 sec%.$", "Hp5"}, -- Yes, both "every" and "per" are used on items...
+	{"^Equip: Restores (%d+) health per 5 seconds%.$", "Hp5"}, -- Turtle WoW: full "seconds" wording
 	{"^%+?(%d+) [hH]ealth [eE]very 5 [sS]ec%.?$", "Hp5"}, -- Aquamarine Signet of Regeneration
 	{"^%+?(%d+) [hH]ealth [pP]er 5 [sS]ec%.?$", "Hp5"}, -- Anglesite Choker of Regeneration
 	{"^Vitality$", "Mp5", 4, PawnMultipleStatsFixed, "Hp5", 4, PawnMultipleStatsFixed}, -- boots enchantment

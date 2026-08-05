@@ -83,7 +83,7 @@ MP5 is very strong for sustaining long encounters.</p>
 <p class="codeblock"><b><a href="#ScaleTags">Pawn scale tag:</a></b><br />
 <br />
 ( Pawn: v1: "Paladin Holy": Healing=1.0, Intellect=1.0, Mp5=1.9,
-SpellCrit=20.0, Spirit=0.1, Stamina=0.2 )</p>
+SpellCrit=20.0, Spirit=0.1, Stamina=0.2, CastingRegen=0.3 )</p>
 
 <h3>Protection (Tank)</h3>
 <p>Stamina and Armor are top priority for Effective Health.
@@ -138,7 +138,7 @@ because more mana per fight&nbsp;= more heals.</p>
 <p class="codeblock"><b><a href="#ScaleTags">Pawn scale tag:</a></b><br />
 <br />
 ( Pawn: v1: "Priest Holy (short)": Healing=1.0, Intellect=2.3, Mp5=3.5,
-Spirit=0.83, SpellCrit=1.2, Stamina=0.2 )</p>
+Spirit=0.83, SpellCrit=1.2, Stamina=0.2, CastingRegen=0.3 )</p>
 
 <h3>Holy / Discipline (Healer &mdash; long fights)</h3>
 <p>In long fights Intellect loses relative value since base mana regen matters
@@ -146,7 +146,7 @@ more.&nbsp; Spirit and MP5 are favored.</p>
 <p class="codeblock"><b><a href="#ScaleTags">Pawn scale tag:</a></b><br />
 <br />
 ( Pawn: v1: "Priest Holy (long)": Healing=1.0, Intellect=0.44, Mp5=3.5,
-Spirit=0.83, SpellCrit=1.2, Stamina=0.2 )</p>
+Spirit=0.83, SpellCrit=1.2, Stamina=0.2, CastingRegen=0.3 )</p>
 
 <h3>Shadow DPS</h3>
 <p>Spell Hit is top priority until the 16&nbsp;% cap (reduced by Shadow Focus talent).
@@ -155,7 +155,7 @@ Shadow Spell Damage stacks with generic Spell Damage.</p>
 <br />
 ( Pawn: v1: "Priest Shadow": SpellDamage=1.0, ShadowSpellDamage=1.0,
 SpellHit=10.0, SpellCrit=1.25, Intellect=1.5, Mp5=1.8, Spirit=0.35,
-Stamina=0.2 )</p>
+Stamina=0.2, CastingRegen=0.2 )</p>
 
 <!-- ============================================================ SHAMAN -->
 <h2>Shaman</h2>
@@ -169,7 +169,7 @@ Intellect is secondary in long progression fights.</p>
 <p class="codeblock"><b><a href="#ScaleTags">Pawn scale tag:</a></b><br />
 <br />
 ( Pawn: v1: "Shaman Resto": Healing=1.0, Mp5=3.0, Intellect=0.8,
-SpellCrit=10.0, Spirit=0.1, Stamina=0.2, Haste=2.0 )</p>
+SpellCrit=10.0, Spirit=0.1, Stamina=0.2, Haste=2.0, CastingRegen=3.5 )</p>
 
 <h3>Enhancement (Melee DPS)</h3>
 <p>Uses a two-handed weapon in vanilla (no dual wield until TBC).
@@ -181,7 +181,7 @@ SpeedBaseline=2.9 means weapons faster than 2.9s are penalised.</p>
 <br />
 ( Pawn: v1: "Shaman Enhancement": Hit=20.0, Ap=1.0, Strength=2.0, Agility=1.5,
 Crit=15.0, Stamina=0.2, TwoHandDps=6.0, TwoHandSpeed=10, SpeedBaseline=2.9,
-SpellDamage=1.5, NatureSpellDamage=1.5, Haste=2.5 )</p>
+SpellDamage=1.5, NatureSpellDamage=1.5, Haste=2.5, CastingRegen=0.1 )</p>
 
 <h3>Elemental DPS</h3>
 <p>Spell Hit is the top priority. Nature Spell Damage stacks with generic Spell
@@ -189,7 +189,7 @@ Damage for lightning and lava burst abilities.</p>
 <p class="codeblock"><b><a href="#ScaleTags">Pawn scale tag:</a></b><br />
 <br />
 ( Pawn: v1: "Shaman Elemental": SpellDamage=1.0, NatureSpellDamage=0.9,
-SpellHit=10.0, SpellCrit=1.5, Intellect=0.8, Mp5=2.0, Stamina=0.2, Haste=7.5 )</p>
+SpellHit=10.0, SpellCrit=1.5, Intellect=0.8, Mp5=2.0, Stamina=0.2, Haste=7.5, CastingRegen=2.0 )</p>
 
 <!-- ============================================================ MAGE -->
 <h2>Mage</h2>
@@ -205,20 +205,20 @@ burst. Haste is especially strong for this spec.</p>
 <br />
 ( Pawn: v1: "Mage Arcane": SpellHit=20.0, SpellDamage=1.0,
 ArcaneSpellDamage=0.9, Haste=0.9, SpellCrit=1.0, Intellect=0.5,
-Mp5=1.5, Stamina=0.1 )</p>
+Mp5=1.5, Stamina=0.1, CastingRegen=0.2 )</p>
 
 <h3>Fire DPS</h3>
 <p>Crit is more valuable for Fire than other specs due to the Ignite talent.</p>
 <p class="codeblock"><b><a href="#ScaleTags">Pawn scale tag:</a></b><br />
 <br />
 ( Pawn: v1: "Mage Fire": SpellHit=20.0, SpellDamage=1.0,
-FireSpellDamage=0.9, SpellCrit=2.0, Intellect=0.5, Mp5=1.5, Stamina=0.1 )</p>
+FireSpellDamage=0.9, SpellCrit=2.0, Intellect=0.5, Mp5=1.5, Stamina=0.1, CastingRegen=0.2 )</p>
 
 <h3>Frost DPS</h3>
 <p class="codeblock"><b><a href="#ScaleTags">Pawn scale tag:</a></b><br />
 <br />
 ( Pawn: v1: "Mage Frost": SpellHit=20.0, SpellDamage=1.0,
-FrostSpellDamage=0.9, SpellCrit=1.5, Intellect=0.5, Mp5=1.5, Stamina=0.1 )</p>
+FrostSpellDamage=0.9, SpellCrit=1.5, Intellect=0.5, Mp5=1.5, Stamina=0.1, CastingRegen=0.2 )</p>
 
 <!-- ============================================================ WARLOCK -->
 <h2>Warlock</h2>
@@ -233,7 +233,7 @@ Long DoT fights reward Intellect and MP5.</p>
 <br />
 ( Pawn: v1: "Warlock Affliction": SpellHit=20.0, SpellDamage=1.0,
 ShadowSpellDamage=0.8, SpellCrit=1.5, Intellect=0.8, Spirit=0.4,
-Mp5=2.0, Stamina=0.2 )</p>
+Mp5=2.0, Stamina=0.2, CastingRegen=0.2 )</p>
 
 <h3>Destruction DPS</h3>
 <p>Higher burst potential; crit is more impactful than in Affliction.</p>
@@ -241,7 +241,7 @@ Mp5=2.0, Stamina=0.2 )</p>
 <br />
 ( Pawn: v1: "Warlock Destruction": SpellHit=20.0, SpellDamage=1.0,
 ShadowSpellDamage=0.8, FireSpellDamage=0.8, SpellCrit=2.0, Intellect=0.7,
-Mp5=1.5, Stamina=0.2 )</p>
+Mp5=1.5, Stamina=0.2, CastingRegen=0.2 )</p>
 
 <!-- ============================================================ DRUID -->
 <h2>Druid</h2>
@@ -274,7 +274,7 @@ Spell Hit is the top priority; generic Spell Damage applies to all spells.</p>
 <br />
 ( Pawn: v1: "Druid Balance": SpellHit=10.0, SpellDamage=1.0,
 NatureSpellDamage=0.7, ArcaneSpellDamage=0.7, SpellCrit=1.5,
-Intellect=0.8, Mp5=2.0, Stamina=0.2 )</p>
+Intellect=0.8, Mp5=2.0, Stamina=0.2, CastingRegen=0.2 )</p>
 
 <h3>Restoration (Healer)</h3>
 <p>Source: VanillaRatingBuster DruidResto-EP.
@@ -283,6 +283,6 @@ Spirit converts partially to mana regen while casting via Improved Regrowth.</p>
 <p class="codeblock"><b><a href="#ScaleTags">Pawn scale tag:</a></b><br />
 <br />
 ( Pawn: v1: "Druid Resto": Healing=1.0, SpellDamage=1.0, Mp5=3.0,
-Spirit=0.46, Intellect=0.3, SpellCrit=10.0, Mana=0.02, Stamina=0.15 )</p>
+Spirit=0.46, Intellect=0.3, SpellCrit=10.0, Mana=0.02, Stamina=0.15, CastingRegen=0.3 )</p>
 
 </body></html>
