@@ -632,6 +632,19 @@ function PawnAddSetBonusValuesToTooltip(Tooltip, SetBonusValues)
 	end
 end
 
+-- Builds a stable string key from a SetBonusStats table for deduplication.
+-- All pieces of the same item set display identical active bonuses, so we use
+-- the sorted stat=value pairs as a signature to avoid double-counting.
+local function PawnGetSetBonusSignature(Stats)
+	if not Stats or not next(Stats) then return nil end
+	local Parts = {}
+	for Stat, Quantity in pairs(Stats) do
+		table.insert(Parts, Stat .. "=" .. tostring(Quantity))
+	end
+	table.sort(Parts)
+	return table.concat(Parts, "|")
+end
+
 -- Returns the total scale values of all equipped items.  Only counts enchanted values.
 -- Parameters: UnitName
 --		UnitName: The name of the unit from whom the inventory item should be retrieved.  Defaults to "player".
@@ -640,14 +653,35 @@ end
 --		Count: The number of item values calculated.
 function PawnGetInventoryItemValues(UnitName)
 	local Total = {}
-	local SlotStats
+	local TotalSetBonusStats = {}
+	local SeenSetSignatures = {}
 	for Slot = 0, 19 do
-		SlotStats, SlotSocketBonusStats = PawnGetStatsForInventorySlot(Slot, false, UnitName)
-		ItemValues = PawnGetAllItemValues(SlotStats, SlotSocketBonusStats)
+		local SlotStats, SlotSocketBonusStats, _, _, SlotSetBonusStats = PawnGetStatsForInventorySlot(Slot, false, UnitName)
+		local ItemValues = PawnGetAllItemValues(SlotStats, SlotSocketBonusStats)
 		-- Now, add these values to our running totals.
 		for _, Entry in pairs(ItemValues) do
 			local ScaleName, Value = Entry[1], Entry[2]
 			PawnAddStatToTable(Total, ScaleName, Value) -- (not actually stats, but the function does what we want)
+		end
+		-- Collect set bonus stats, deduplicating by signature so each set is counted once.
+		if SlotSetBonusStats and next(SlotSetBonusStats) then
+			local Signature = PawnGetSetBonusSignature(SlotSetBonusStats)
+			if Signature and not SeenSetSignatures[Signature] then
+				SeenSetSignatures[Signature] = true
+				for Stat, Quantity in pairs(SlotSetBonusStats) do
+					PawnAddStatToTable(TotalSetBonusStats, Stat, Quantity)
+				end
+			end
+		end
+	end
+	-- Convert merged set bonus stats to scale values and add to the running totals.
+	if next(TotalSetBonusStats) then
+		local SetBonusValues = PawnGetAllItemValues(TotalSetBonusStats, nil, nil, nil, false)
+		if SetBonusValues then
+			for _, Entry in pairs(SetBonusValues) do
+				local ScaleName, Value = Entry[1], Entry[2]
+				PawnAddStatToTable(Total, ScaleName, Value)
+			end
 		end
 	end
 	-- Once we're done, we need to convert our addition table to one that we can return.
