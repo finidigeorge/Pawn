@@ -37,6 +37,76 @@ The <a href="https://github.com/kxseven/VanillaRatingBuster" target="_blank">Van
 addon provides in-tooltip ratings for several specs and is the primary source for
 the feral druid, warrior, paladin, priest, and shaman weights below.</p>
 
+<!-- ============================================================ CASTING REGEN -->
+<h3 id="CastingRegen">Casting mana regen (CastingRegen)</h3>
+<p>Some Turtle WoW items grant &quot;Allows X% of your Mana regeneration to continue
+while casting&quot; (the Pawn <b>CastingRegen</b> stat).&nbsp; In vanilla, casting stops all
+Spirit-based regeneration (the 5-second rule), so this stat converts a portion of
+the regeneration you already have into always-on regen.&nbsp; Its value therefore
+scales with your total Spirit.</p>
+<p>At level 60, 1 Spirit &asymp; 0.625 mana per 5 seconds while not casting, plus a
+base of about 32.5 Mp5, so your out-of-casting regen is:</p>
+<p class="codeblock">R = 0.625 &times; Spirit + 32.5&nbsp;&nbsp;(mana per 5 sec)</p>
+<p>The value of 1% CastingRegen, in the same units as your Mp5 weight, is:</p>
+<p class="codeblock">CastingRegen = Mp5 &times; R / 100 &times; f<br />
+where f = fraction of time spent casting (assume 0.9)</p>
+<p>Worked example &mdash; Shaman Resto with Mp5=3.0, 155 Spirit, f=0.9:<br />
+R = 0.625 &times; 155 + 32.5 &asymp; 129 Mp5<br />
+CastingRegen = 3.0 &times; 129 / 100 &times; 0.9 &asymp; 3.5</p>
+<p>Quick rule of thumb (ignores the base 32.5 and assumes 100% uptime):<br />
+CastingRegen &asymp; Mp5 &times; Spirit / 160</p>
+<p>Simplified, with f=0.9 baked in &mdash; just multiply your spec&rsquo;s constant k by
+your out-of-casting regen R:</p>
+<p class="codeblock">CastingRegen = k &times; (0.625 &times; Spirit + 32.5)</p>
+<p class="codeblock">Priest Holy:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; k = 0.0315<br />
+Shaman Resto / Druid Resto:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; k = 0.027<br />
+Shaman Elemental / Warlock Affliction / Druid Balance:&nbsp; k = 0.018<br />
+Paladin Holy:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; k = 0.0171<br />
+Priest Shadow:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; k = 0.0162<br />
+Mages / Warlock Destruction:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; k = 0.0135</p>
+<p>If your casting uptime is not 90%, scale k by f / 0.9.&nbsp; Example &mdash; Shaman
+Resto, 112 Spirit, 80% uptime:&nbsp; k = 0.027 &times; 0.8 / 0.9 = 0.024 and
+R = 0.625 &times; 112 + 32.5 = 102.5, so CastingRegen = 0.024 &times; 102.5 &asymp; 2.5.</p>
+<p>The scales below assume these Spirit values (raid gear):<br />
+Priest Holy 350, Priest Shadow 250, Druid Resto 275, Warlock Affliction 175,
+Paladin Holy 175, Shaman Resto 155, Mages / Warlock Destruction / Druid Balance
+150, Shaman Elemental 125.</p>
+
+<!-- ============================================================ SPIRIT REGEN -->
+<h3 id="Spirit">Spirit &rarr; mana regen</h3>
+<p>The mirror image of CastingRegen: your <b>Spirit</b> weight should follow from your
+<b>Mp5</b> weight, because Spirit only produces mana while you are not casting.
+1 Spirit &asymp; 0.625 Mp5 out of casting, so:</p>
+<p class="codeblock">Spirit = Mp5 &times; 0.625 &times; u<br />
+u = fraction of the fight you benefit from out-of-casting regen<br />
+u = downtime + (CastingRegen% total) &times; uptime</p>
+<p>Simplified per playstyle:</p>
+<p class="codeblock">Chain-caster, no regen while casting (Shaman / Paladin Holy): u &asymp; 0.05 &rarr; Spirit = Mp5 &times; 0.03<br />
+Typical healer with 15% Meditation/Reflection (Priest / Druid): u &asymp; 0.25 &rarr; Spirit = Mp5 &times; 0.16<br />
+Spirit Tap / high downtime (Shadow Priest, Warlock): u &asymp; 0.30 &rarr; Spirit = Mp5 &times; 0.19</p>
+<p>Class bonuses added on top: Priest &mdash; Spiritual Guidance converts 25% of Spirit
+into spell damage/healing, so add 0.25 &times; your Healing/SpellDamage weight
+(0.25 when Healing=1.0).</p>
+
+<!-- ============================================================ FIXED CONVERSIONS -->
+<h3 id="Conversions">Fixed attribute conversions</h3>
+<p class="codeblock">Mana = Intellect / 15&nbsp;&nbsp;(1 Intellect = 15 mana)<br />
+Health = Stamina / 10&nbsp;&nbsp;(1 Stamina = 10 health)<br />
+Intellect gives no spell crit in vanilla (that starts in TBC).</p>
+<p>Attack power:</p>
+<p class="codeblock">Warrior / Paladin / Shaman:&nbsp;&nbsp; Ap = Strength &times; 2<br />
+Druid (Cat / Bear):&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Ap = Strength &times; 2<br />
+Rogue / Hunter melee:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Ap = Strength &times; 1 and Ap = Agility &times; 1<br />
+Hunter ranged:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Rap = Agility &times; 2</p>
+<p>Critical strike from Agility (Agility per 1% crit):</p>
+<p class="codeblock">Warrior / Paladin / Shaman / Druid:&nbsp; 20<br />
+Rogue:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 29<br />
+Hunter:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 53</p>
+<p>Dodge from Agility (Agility per 1% dodge): Warrior / Paladin / Shaman / Druid 20,
+Rogue 14.5, Hunter 26.5.<br />
+Defense (tanks): 1 Defense skill = 0.04% Dodge + 0.04% Parry + 0.04% Block +
+0.04% chance to be missed.</p>
+
 <!-- ============================================================ WARRIOR -->
 <h2>Warrior</h2>
 <p>Warriors have three main specs in Turtle WoW: Arms (two-handed PvE/PvP), Fury (dual-wield DPS), and Protection (tank).
@@ -83,7 +153,7 @@ MP5 is very strong for sustaining long encounters.</p>
 <p class="codeblock"><b><a href="#ScaleTags">Pawn scale tag:</a></b><br />
 <br />
 ( Pawn: v1: "Paladin Holy": Healing=1.0, Intellect=1.0, Mp5=1.9,
-SpellCrit=20.0, Spirit=0.1, Stamina=0.2, CastingRegen=0.3 )</p>
+SpellCrit=20.0, Spirit=0.1, Stamina=0.2, CastingRegen=2.4 )</p>
 
 <h3>Protection (Tank)</h3>
 <p>Stamina and Armor are top priority for Effective Health.
@@ -138,7 +208,7 @@ because more mana per fight&nbsp;= more heals.</p>
 <p class="codeblock"><b><a href="#ScaleTags">Pawn scale tag:</a></b><br />
 <br />
 ( Pawn: v1: "Priest Holy (short)": Healing=1.0, Intellect=2.3, Mp5=3.5,
-Spirit=0.83, SpellCrit=1.2, Stamina=0.2, CastingRegen=0.3 )</p>
+Spirit=0.83, SpellCrit=1.2, Stamina=0.2, CastingRegen=7.9 )</p>
 
 <h3>Holy / Discipline (Healer &mdash; long fights)</h3>
 <p>In long fights Intellect loses relative value since base mana regen matters
@@ -146,7 +216,7 @@ more.&nbsp; Spirit and MP5 are favored.</p>
 <p class="codeblock"><b><a href="#ScaleTags">Pawn scale tag:</a></b><br />
 <br />
 ( Pawn: v1: "Priest Holy (long)": Healing=1.0, Intellect=0.44, Mp5=3.5,
-Spirit=0.83, SpellCrit=1.2, Stamina=0.2, CastingRegen=0.3 )</p>
+Spirit=0.83, SpellCrit=1.2, Stamina=0.2, CastingRegen=7.9 )</p>
 
 <h3>Shadow DPS</h3>
 <p>Spell Hit is top priority until the 16&nbsp;% cap (reduced by Shadow Focus talent).
@@ -155,7 +225,7 @@ Shadow Spell Damage stacks with generic Spell Damage.</p>
 <br />
 ( Pawn: v1: "Priest Shadow": SpellDamage=1.0, ShadowSpellDamage=1.0,
 SpellHit=10.0, SpellCrit=1.25, Intellect=1.5, Mp5=1.8, Spirit=0.35,
-Stamina=0.2, CastingRegen=0.2 )</p>
+Stamina=0.2, CastingRegen=3.1 )</p>
 
 <!-- ============================================================ SHAMAN -->
 <h2>Shaman</h2>
@@ -205,20 +275,20 @@ burst. Haste is especially strong for this spec.</p>
 <br />
 ( Pawn: v1: "Mage Arcane": SpellHit=20.0, SpellDamage=1.0,
 ArcaneSpellDamage=0.9, Haste=0.9, SpellCrit=1.0, Intellect=0.5,
-Mp5=1.5, Stamina=0.1, CastingRegen=0.2 )</p>
+Mp5=1.5, Stamina=0.1, CastingRegen=1.7 )</p>
 
 <h3>Fire DPS</h3>
 <p>Crit is more valuable for Fire than other specs due to the Ignite talent.</p>
 <p class="codeblock"><b><a href="#ScaleTags">Pawn scale tag:</a></b><br />
 <br />
 ( Pawn: v1: "Mage Fire": SpellHit=20.0, SpellDamage=1.0,
-FireSpellDamage=0.9, SpellCrit=2.0, Intellect=0.5, Mp5=1.5, Stamina=0.1, CastingRegen=0.2 )</p>
+FireSpellDamage=0.9, SpellCrit=2.0, Intellect=0.5, Mp5=1.5, Stamina=0.1, CastingRegen=1.7 )</p>
 
 <h3>Frost DPS</h3>
 <p class="codeblock"><b><a href="#ScaleTags">Pawn scale tag:</a></b><br />
 <br />
 ( Pawn: v1: "Mage Frost": SpellHit=20.0, SpellDamage=1.0,
-FrostSpellDamage=0.9, SpellCrit=1.5, Intellect=0.5, Mp5=1.5, Stamina=0.1, CastingRegen=0.2 )</p>
+FrostSpellDamage=0.9, SpellCrit=1.5, Intellect=0.5, Mp5=1.5, Stamina=0.1, CastingRegen=1.7 )</p>
 
 <!-- ============================================================ WARLOCK -->
 <h2>Warlock</h2>
@@ -233,7 +303,7 @@ Long DoT fights reward Intellect and MP5.</p>
 <br />
 ( Pawn: v1: "Warlock Affliction": SpellHit=20.0, SpellDamage=1.0,
 ShadowSpellDamage=0.8, SpellCrit=1.5, Intellect=0.8, Spirit=0.4,
-Mp5=2.0, Stamina=0.2, CastingRegen=0.2 )</p>
+Mp5=2.0, Stamina=0.2, CastingRegen=2.6 )</p>
 
 <h3>Destruction DPS</h3>
 <p>Higher burst potential; crit is more impactful than in Affliction.</p>
@@ -241,7 +311,7 @@ Mp5=2.0, Stamina=0.2, CastingRegen=0.2 )</p>
 <br />
 ( Pawn: v1: "Warlock Destruction": SpellHit=20.0, SpellDamage=1.0,
 ShadowSpellDamage=0.8, FireSpellDamage=0.8, SpellCrit=2.0, Intellect=0.7,
-Mp5=1.5, Stamina=0.2, CastingRegen=0.2 )</p>
+Mp5=1.5, Stamina=0.2, CastingRegen=1.7 )</p>
 
 <!-- ============================================================ DRUID -->
 <h2>Druid</h2>
@@ -274,15 +344,15 @@ Spell Hit is the top priority; generic Spell Damage applies to all spells.</p>
 <br />
 ( Pawn: v1: "Druid Balance": SpellHit=10.0, SpellDamage=1.0,
 NatureSpellDamage=0.7, ArcaneSpellDamage=0.7, SpellCrit=1.5,
-Intellect=0.8, Mp5=2.0, Stamina=0.2, CastingRegen=0.2 )</p>
+Intellect=0.8, Mp5=2.0, Stamina=0.2, CastingRegen=2.3 )</p>
 
 <h3>Restoration (Healer)</h3>
 <p>Source: VanillaRatingBuster DruidResto-EP.
 MP5 is extremely valuable due to mana-intensive HoT rotations.
-Spirit converts partially to mana regen while casting via Improved Regrowth.</p>
+Spirit converts partially to mana regen while casting via the Reflection talent.</p>
 <p class="codeblock"><b><a href="#ScaleTags">Pawn scale tag:</a></b><br />
 <br />
 ( Pawn: v1: "Druid Resto": Healing=1.0, SpellDamage=1.0, Mp5=3.0,
-Spirit=0.46, Intellect=0.3, SpellCrit=10.0, Mana=0.02, Stamina=0.15, CastingRegen=0.3 )</p>
+Spirit=0.46, Intellect=0.3, SpellCrit=10.0, Mana=0.02, Stamina=0.15, CastingRegen=5.5 )</p>
 
 </body></html>
