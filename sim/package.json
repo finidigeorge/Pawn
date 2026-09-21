@@ -1,0 +1,10 @@
+{
+  "name": "pawn-sim",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Drives the wowsims-turtle web sim to turn in-game character exports into Pawn stat weights.",
+  "dependencies": {
+    "playwright-core": "^1.48.0"
+  }
+}

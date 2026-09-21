@@ -171,6 +171,23 @@ PawnUIFrame_ScaleColorSwatch_Tooltip = "Change the color that this scale's name 
 PawnUIFrame_ShowScaleCheck_Label_Text = "Show this scale in tooltips"
 PawnUIFrame_ShowScaleCheck_Tooltip = "Uncheck this option to keep it from showing up in your tooltips, without having to actually delete it."
 
+-- Configuration UI, Sim tab
+PawnUIFrame_SimTab_Text = "Sim"
+
+PawnUIFrame_SimHeaderLabel_Text = "Simulated stat weights (wowsims-turtle)"
+PawnUIFrame_SimInfoLabel_Text = "Export this character's gear and talents, then run the local sim to generate stat weights for your current setup.\n\n1. Click \"1. Export character\" (exports the CURRENT scale's name and your equipped items).\n2. Type /reload once so the export file is written to disk.\n3. Open a PowerShell 7 window in the Pawn folder and run:  .\\sim.ps1\n4. When the sim is done it rewrites sim\\SimResults.lua. Type /reload, then click \"2. Apply sim results\".\n\nThe weights are written into the currently selected scale (see the Scales tab)."
+PawnUIFrame_SimDumpButton_Text = "1. Export character"
+PawnUIFrame_SimDumpButton_Tooltip = "Writes your equipped items and talents into the PawnSimDump saved variable. Type /reload afterwards so the file is written to disk, then run sim.ps1."
+PawnUIFrame_SimApplyButton_Text = "2. Apply sim results"
+PawnUIFrame_SimApplyButton_Tooltip = "Writes the simulated stat weights into the currently selected scale. Requires sim.ps1 to have finished and the game to be reloaded."
+
+PawnSimExportChatPrefix = "\124cffffd100[PawnSim]\124r "
+PawnSimExportDumpedMessage = "Character exported for sim. Now type /reload and run sim.ps1 from the Pawn folder."
+PawnSimExportNoScaleMessage = "No scale selected. Open the Scales tab and choose a scale first."
+PawnSimExportAppliedMessage = "Applied %d simulated stats to scale \"%s\"."
+PawnSimExportNoResultsMessage = "No sim results are loaded. Run sim.ps1, type /reload, and try again."
+PawnSimExportResultsStampMessage = "Loaded sim results: %s (source: %s)."
+
 -- Configuration UI, Compare tab
 PawnUIFrame_CompareTab_Text = "Compare"
 
@@ -421,8 +438,18 @@ PawnNormalizationRegexes =
 {
 	{"^Set: ", "Equip: "}, -- Normalize "Set: " to "Equip: " so set bonus lines match existing Equip: regexes
 	{"^set: ", "Equip: "},
+	{"^[eE]quip: ", "Equip: "}, -- Normalize a lowercase "equip: " prefix so the standard Equip: patterns match
+	{"^([%a]+: )[iI]mproves ", "%1Improves "}, -- Normalize a lowercase "improves" that follows a prefix (Equip:, Set:, ...)
+	{"^([%a]+: )[iI]ncreases ", "%1Increases "},
+	{"^[iI]mproves ", "Improves "}, -- Normalize a lowercase "improves" at the start of a line
+	{"^[iI]ncreases ", "Increases "},
 	{"^Equip: (%+%d+.-)%.?$", "%1"}, -- Strip "Equip: " from direct +N stat set bonus lines (e.g. "Equip: +8 All Resistances." -> "+8 All Resistances")
 	{"^([%w%s%.]+) %+(%d+)$", "+%2 %1"}, -- "Stamina +5" --> "+5 Stamina"
+	{"your chance to hit with melee and ranged attacks", "your chance to hit"}, -- Melee/ranged-only hit wording --> physical "Hit"
+	{"your chance to hit with melee attacks", "your chance to hit"},
+	{"your chance to hit with ranged attacks", "your chance to hit"},
+	{"your chance to hit with all attacks", "your chance to hit"},
+	{"your chance to hit with attacks and spells", "your chance to hit with spells and attacks"}, -- Reversed word order --> "Hit" + "SpellHit"
 	{"^(.-)|r.*", "%1"}, -- For removing meta gem requirements
 }
 
@@ -543,6 +570,10 @@ PawnRegexes =
 	{"^Equip: Increases your attack and casting speed by (%d+)%%%.?$", "Haste"}, -- Turtle WoW set bonus (Set: normalized to Equip:)
 	{"^Equip: Improves your chance to hit by (%d+)%%%.?$", "Hit"},
 	{"^Equip: Increases your chance to hit by (%d+)%%%.?$", "Hit"},
+	{"^Equip: Improves your chance to hit with spells and attacks by (%d+)%%%.?$", "Hit", 1, PawnMultipleStatsExtract, "SpellHit", 1, PawnMultipleStatsExtract}, -- e.g. Rune of the Guard Captain (Horde)
+	{"^Equip: Increases your chance to hit with spells and attacks by (%d+)%%%.?$", "Hit", 1, PawnMultipleStatsExtract, "SpellHit", 1, PawnMultipleStatsExtract},
+	{"^Improves your chance to hit with spells and attacks by (%d+)%%%.?$", "Hit", 1, PawnMultipleStatsExtract, "SpellHit", 1, PawnMultipleStatsExtract},
+	{"^Increases your chance to hit with spells and attacks by (%d+)%%%.?$", "Hit", 1, PawnMultipleStatsExtract, "SpellHit", 1, PawnMultipleStatsExtract},
 	{"^Equip: ([%d%.,]+)%% of damage dealt is returned as healing%.?$", "Vampirism"},
 	{"^Equip: ([%d%.,]+)%% of damage you deal is returned as healing%.?$", "Vampirism"},
 	{"^Set: ([%d%.,]+)%% of damage dealt is returned as healing%.?$", "Vampirism"},
@@ -563,6 +594,8 @@ PawnRegexes =
 	{"^Equip: Increases your chance to get a critical strike by (%d+)%%%.?$", "Crit"},
 	{"^Equip: Improves your chance to hit with spells by (%d+)%%%.?$", "SpellHit"},
 	{"^Equip: Increases your chance to hit with spells by (%d+)%%%.?$", "SpellHit"},
+	{"^Improves your chance to hit with spells by (%d+)%%%.?$", "SpellHit"}, -- No "Equip: " prefix
+	{"^Increases your chance to hit with spells by (%d+)%%%.?$", "SpellHit"},
 	{"^Equip: Improves your chance to get a critical strike with spells by (%d+)%%%.?$", "SpellCrit"},
 	{"^Equip: Increases your chance to get a critical strike with spells by (%d+)%%%.?$", "SpellCrit"},
 	{"^Equip: Improves your chance to get a critical strike with .+ spells by (%d+)%%%.?$", "SpellCrit"}, -- e.g. "with all Shock spells", "with Nature spells"

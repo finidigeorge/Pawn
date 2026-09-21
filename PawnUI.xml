@@ -983,6 +983,53 @@
 				</Layers>
 			</Frame>
 			
+			<!-- The Sim tab -->
+			<Frame name="PawnUISimTabPage" hidden="true" inherits="PawnUITabPageTemplate">
+				<Layers>
+					<Layer level="ARTWORK">
+
+						<FontString name="PawnUIFrame_SimHeaderLabel" inherits="GameFontNormalLarge" justifyH="LEFT" text="PawnUIFrame_SimHeaderLabel_Text">
+							<Anchors><Anchor point="TOPLEFT"><Offset><AbsDimension x="25" y="-24" /></Offset></Anchor></Anchors>
+						</FontString>
+
+						<FontString name="PawnUIFrame_SimInfoLabel" inherits="GameFontHighlight" justifyH="LEFT" justifyV="TOP" text="PawnUIFrame_SimInfoLabel_Text">
+							<Anchors><Anchor point="TOPLEFT" relativeTo="PawnUIFrame_SimHeaderLabel" relativePoint="BOTTOMLEFT"><Offset><AbsDimension x="0" y="-10" /></Offset></Anchor></Anchors>
+							<Size><AbsDimension x="560" y="135" /></Size>
+						</FontString>
+
+						<FontString name="PawnUIFrame_SimStatusLabel" inherits="GameFontHighlight" justifyH="LEFT" justifyV="TOP" text="">
+							<Anchors><Anchor point="TOPLEFT" relativeTo="PawnUIFrame_SimInfoLabel" relativePoint="BOTTOMLEFT"><Offset><AbsDimension x="0" y="-56" /></Offset></Anchor></Anchors>
+							<Size><AbsDimension x="560" y="120" /></Size>
+						</FontString>
+
+					</Layer>
+				</Layers>
+
+				<!-- Sim tab: UI elements -->
+				<Frames>
+
+					<Button name="PawnUIFrame_SimDumpButton" inherits="PawnUIButtonTemplate" text="PawnUIFrame_SimDumpButton_Text">
+						<Anchors><Anchor point="TOPLEFT" relativeTo="PawnUIFrame_SimInfoLabel" relativePoint="BOTTOMLEFT"><Offset><AbsDimension x="0" y="-12" /></Offset></Anchor></Anchors>
+						<Size><AbsDimension x="170" y="25" /></Size>
+						<Scripts>
+							<OnClick>PawnUIFrame_SimDumpButton_OnClick()</OnClick>
+						</Scripts>
+					</Button>
+
+					<Button name="PawnUIFrame_SimApplyButton" inherits="PawnUIButtonTemplate" text="PawnUIFrame_SimApplyButton_Text">
+						<Anchors><Anchor point="LEFT" relativeTo="PawnUIFrame_SimDumpButton" relativePoint="RIGHT"><Offset><AbsDimension x="14" y="0" /></Offset></Anchor></Anchors>
+						<Size><AbsDimension x="170" y="25" /></Size>
+						<Scripts>
+							<OnClick>PawnUIFrame_SimApplyButton_OnClick()</OnClick>
+						</Scripts>
+					</Button>
+
+				</Frames>
+				<Scripts>
+					<OnShow>PawnUIFrame_SimTabPage_OnShow()</OnShow>
+				</Scripts>
+			</Frame>
+			
 			<!-- The tab buttons -->
 			<Button name="$parentTab1" inherits="CharacterFrameTabButtonTemplate" id="1" text="PawnUIFrame_ScalesTab_Text">
 				<Anchors><Anchor point="LEFT" relativePoint="BOTTOMLEFT"><Offset><AbsDimension x="6" y="-10" /></Offset></Anchor></Anchors>
@@ -1029,6 +1076,15 @@
 					</OnClick>
 				</Scripts>
 			</Button>
+			<Button name="$parentTab6" inherits="CharacterFrameTabButtonTemplate" id="6" text="PawnUIFrame_SimTab_Text">
+				<Anchors><Anchor point="RIGHT" relativeTo="$parentTab5" relativePoint="LEFT"><Offset><AbsDimension x="16" y="0" /></Offset></Anchor></Anchors>
+				<Scripts>
+					<OnClick>
+						PlaySound("igCharacterInfoTab")
+						PawnUISwitchToTab(6)
+					</OnClick>
+				</Scripts>
+			</Button>
 
 		</Frames>
 
@@ -1037,7 +1093,7 @@
 				this:RegisterEvent("VARIABLES_LOADED")
 				this:RegisterEvent("ADDON_LOADED")
 				this:RegisterEvent("UPDATE_BINDINGS")
-				PawnUITabList = { PawnUIScalesTabPage, PawnUICompareTabPage, PawnUIOptionsTabPage, PawnUIAboutTabPage, PawnUIHelpTabPage }
+				PawnUITabList = { PawnUIScalesTabPage, PawnUICompareTabPage, PawnUIOptionsTabPage, PawnUIAboutTabPage, PawnUIHelpTabPage, PawnUISimTabPage }
 				PanelTemplates_SetNumTabs(PawnUIFrame, table.getn(PawnUITabList))
 			</OnLoad>
 			<OnEvent>

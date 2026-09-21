@@ -4,6 +4,7 @@
 ## Notes: Pawn performs item value assessments to make it easier to decide which items are better than others.
 ## OptionalDependencies: AtlasLoot, EQCompare, EquipCompare, MultiTips
 ## SavedVariablesPerCharacter: PawnOptions
+## SavedVariables: PawnSimDump, PawnSimDumpTime
 
 VgerCore\VgerCore.lua
 
@@ -11,5 +12,7 @@ Localization.lua
 Pawn.lua
 PawnBootstrap.lua
 PawnTooltipBuilder.lua
+sim\SimResults.lua
+SimExport.lua
 PawnUI.lua
 PawnUI.xml

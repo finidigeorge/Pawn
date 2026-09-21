@@ -1,0 +1,92 @@
+{
+  "raidBuffs": {
+    "giftOfTheWild": "TristateEffectImproved",
+    "powerWordFortitude": "TristateEffectImproved",
+    "arcaneBrilliance": true,
+    "divineSpirit": true,
+    "battleShout": "TristateEffectImproved",
+    "leaderOfThePack": true,
+    "manaSpringTotem": "TristateEffectRegular",
+    "fireResistanceTotem": true
+  },
+  "debuffs": {
+    "faerieFire": true,
+    "fireVulnerability": true,
+    "exposeArmor": "TristateEffectImproved",
+    "sunderArmor": true,
+    "curseOfRecklessness": true
+  },
+  "partyBuffs": {},
+  "player": {
+    "name": "Player",
+    "race": "RaceOrc",
+    "class": "ClassShaman",
+    "equipment": {
+      "items": []
+    },
+    "consumes": {
+      "flask": "FlaskOfSupremePower",
+      "food": "FoodBlessSunfruit",
+      "agilityElixir": "ElixirOfTheMongoose",
+      "strengthBuff": "JujuPower",
+      "attackPowerBuff": "JujuMight",
+      "spellPowerBuff": "GreaterArcaneElixir",
+      "firePowerBuff": "ElixirOfFirepower",
+      "mainHandImbue": "WindfuryWeapon",
+      "defaultPotion": "MajorManaPotion",
+      "defaultConjured": "ConjuredDemonicRune"
+    },
+    "bonusStats": {
+      "stats": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      "pseudoStats": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    },
+    "itemSwap": {},
+    "buffs": {
+      "rallyingCryOfTheDragonslayer": true,
+      "songflowerSerenade": true,
+      "warchiefsBlessing": true,
+      "fengusFerocity": true,
+      "moldarsMoxie": true,
+      "slipkiksSavvy": true
+    },
+    "talentsString": "",
+    "profession1": "Alchemy",
+    "profession2": "Enchanting",
+    "cooldowns": {},
+    "rotation": {
+      "type": "TypeAuto"
+    },
+    "reactionTimeMs": 200,
+    "isbSbFrequency": 3,
+    "isbCrit": 25,
+    "isbWarlocks": 1,
+    "stormstrikeFrequency": 20,
+    "stormstrikeNatureAttackerFrequency": 4,
+    "healingModel": {},
+    "enhancementShaman": {
+      "options": {
+        "syncType": "Auto"
+      }
+    }
+  },
+  "encounter": {
+    "duration": 120,
+    "durationVariation": 15,
+    "executeProportion20": 0.2,
+    "executeProportion25": 0.25,
+    "executeProportion35": 0.35,
+    "targets": [
+      {
+        "id": 50514,
+        "name": "Raid Boss",
+        "level": 63,
+        "mobType": "MobTypeDemon",
+        "stats": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 805, 0, 0, 0, 0, 0, 0, 0, 0, 3731, 0, 0, 0, 0, 0, 0, 0, 127393, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        "minBaseDamage": 3000,
+        "damageSpread": 0.3333,
+        "swingSpeed": 2,
+        "parryHaste": true
+      }
+    ]
+  }
+}

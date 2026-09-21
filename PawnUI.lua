@@ -1313,6 +1313,51 @@ function PawnUISwitchToTab(TabNumber)
 	PanelTemplates_SetTab(PawnUIFrame, TabNumber)	
 end
 
+-- Updates the text on the Sim tab.
+function PawnUIFrame_SimTab_Update()
+	local ScaleName = PawnUICurrentScale
+	if not ScaleName or ScaleName == "" then ScaleName = PawnDefaultScaleName end
+	
+	local Lines = {}
+	table.insert(Lines, string.format("Target scale: %s", tostring(ScaleName)))
+	
+	if PawnSimDumpTime then
+		local Stamp = tostring(PawnSimDumpTime)
+		if date then Stamp = date("%Y-%m-%d %H:%M:%S", PawnSimDumpTime) end
+		table.insert(Lines, string.format("Last character export: %s", Stamp))
+	else
+		table.insert(Lines, "Last character export: never")
+	end
+	
+	if PawnSimResults and PawnSimResults.stats then
+		table.insert(Lines, string.format("Sim results loaded: %s (source: %s)", tostring(PawnSimResults.generatedAt), tostring(PawnSimResults.source)))
+		local Count = 0
+		for _ in pairs(PawnSimResults.stats) do Count = Count + 1 end
+		table.insert(Lines, string.format("Stats available: %d", Count))
+	else
+		table.insert(Lines, "Sim results loaded: none yet")
+	end
+	
+	PawnUIFrame_SimStatusLabel:SetText(table.concat(Lines, "\n"))
+end
+
+-- Called when the Sim tab is shown.
+function PawnUIFrame_SimTabPage_OnShow()
+	PawnUIFrame_SimTab_Update()
+end
+
+-- Exports the character for the local sim.
+function PawnUIFrame_SimDumpButton_OnClick()
+	PawnUIFrame_SimTab_Update()
+	PawnSimDumpCharacter(PawnUICurrentScale)
+end
+
+-- Applies the sim results to the current scale.
+function PawnUIFrame_SimApplyButton_OnClick()
+	PawnUIFrame_SimTab_Update()
+	PawnSimApplyResults(PawnUICurrentScale)
+end
+
 -- Shows a tooltip for a given control if available.
 -- The tooltip used will be the string with the name of the control plus "_Tooltip" on the end.
 -- The title of the tooltip will be the text on a control with the same name plus "_Label" on the

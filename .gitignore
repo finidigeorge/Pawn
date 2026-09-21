@@ -1,0 +1,6 @@
+# Dependencies installed by sim.ps1 (npm install) — regenerated on demand
+sim/node_modules/
+
+# Intermediate files written by sim.ps1 — regenerated each run
+sim/work/import.json
+sim/work/weights.json

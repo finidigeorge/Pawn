@@ -1,0 +1,27 @@
+{
+  "meta": {
+    "url": "https://isfir.github.io/wowsims-turtle/enhancement_shaman/",
+    "iterations": 250,
+    "at": "2026-09-21T09:08:54.407Z",
+    "importConfirm": "Import"
+  },
+  "weights": {
+    "Strength": 2.1052631578947367,
+    "Agility": 1.368421052631579,
+    "Intellect": -0.5789473684210527,
+    "Spell Power": 0.15789473684210525,
+    "Fire Damage": 0.15789473684210525,
+    "Nature Damage": 0,
+    "Mana Per 5 Sec": -2,
+    "Spell Hit": 1.8421052631578947,
+    "Spell Crit": 0.736842105263158,
+    "Attack Power": 1,
+    "Melee Hit": 0,
+    "Melee Crit": 32.21052631578947,
+    "Expertise": 45.578947368421055,
+    "Spell Damage": 0.15789473684210525,
+    "Main Hand DPS": 14.31578947368421,
+    "Off Hand DPS": 0,
+    "Melee Attack Speed": 31.89473684210526
+  }
+}
