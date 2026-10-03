@@ -45,6 +45,7 @@ Pawn -> Sim tab -> "2. Apply"   <--  weights land in your selected scale
 
    ```powershell
    .\sim.ps1                    # 1000 iterations (default)
+   or:
    .\sim.ps1 -Iterations 3000   # more accurate, slower
    .\sim.ps1 -Spec feral_druid  # force the spec slug
    .\sim.ps1 -SkipBrowser       # rebuild results from the last run
